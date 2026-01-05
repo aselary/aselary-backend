@@ -2,7 +2,7 @@ import "../../loadENV.js";
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { transporter } from "../../config/mailer.js";
+import  transporter  from "../../config/mailer.js";
 import { validatePersonalName } from "../utils/validatePersonalName.js"; 
 import isDev from "../utils/isDev.js";
 
