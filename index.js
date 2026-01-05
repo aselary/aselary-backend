@@ -8,6 +8,7 @@ import cors from "cors";
 import helmet from "helmet";           // For security
 import rateLimit from "express-rate-limit"; // Rate limiter  
 import isDev from "./features/utils/isDev.js"; 
+import { transporter } from "./config/mailer.js";
 import paystackWebhookRoute from "./features/stack/paystackWebhook.route.js";     
 import signupRoutes from "./features/signup/signup.routes.js"; // Signup feature
 import signinRoutes from "./features/signin/signin.routes.js"; //Signin feature
