@@ -38,15 +38,6 @@ if (fullName.trim().split(" ").length < 2) {
 // --- FORCE BLOCK CAPITAL LETTERS ---
 const formattedFullName = fullName.trim().toUpperCase();
 
-    // ---------------------------------------------------
-    // 2) REMOVE OLD UNVERIFIED TEMP USERS (email / phone)
-    // ---------------------------------------------------
-    await User.deleteMany({
-      $or: [
-        { email, emailVerified: false, tempUser: true },
-        { phoneNumber, phoneVerified: false, tempUser: true },
-      ],
-    });
 
     // ---------------------------
     // 3) CHECK REAL DUPLICATES
@@ -186,14 +177,8 @@ await newUser.save();
 </div>`,
     };
 
-    // ---------------------------
-    // 10) SEND EMAIL
-    // ---------------------------
-   try {
-  await transporter.sendMail(mailOptions);
-} catch (mailErr) {
-  if (isDev) console.error("OTP EMAIL FAILED:", mailErr);
-}
+transporter.sendMail(mailOptions)
+  .catch(err => console.error("OTP EMAIL FAILED:", err.message));
 
 // 4. ALWAYS return success
 return res.status(201).json({

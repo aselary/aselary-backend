@@ -124,6 +124,8 @@ const userSchema = new mongoose.Schema(
 
   tempUser: { type: Boolean, default: true }, // becomes false when fully activated
   status: { type: String, default: "pending" }, // pending | active | blocked
+
+
   },
 
   { timestamps: true }

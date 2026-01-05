@@ -27,25 +27,10 @@ export const transporter = nodemailer.createTransport({
  * Verify transporter ONLY in development
  * Never block or crash production startup
  */
-if (isDev) {
-  transporter.verify((err) => {
-    if (err) {
-      console.error("❌ Email Transporter Error:", err);
-    } else {
-      console.log("📧 Email Transporter Ready");
-    }
+transporter.verify()
+  .then(() => {
+    console.log("📧 Email transporter ready");
+  })
+  .catch((err) => {
+    console.error("❌ Email transporter FAILED:", err.message);
   });
-}
-
-/**
- * Centralized mail sender
- * Prevents duplicate configs across app
- */
-export const sendMail = async ({ to, subject, html }) => {
-  return transporter.sendMail({
-    from: `"Aselary" <noreply@aselarydm.com>`,
-    to,
-    subject,
-    html,
-  });
-};
