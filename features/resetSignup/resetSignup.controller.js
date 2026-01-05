@@ -1,5 +1,5 @@
 // src/controllers/auth/resetSignup.controller.js
-import User from "../../models/User.js";
+import User from "../models/User.js";
 
 export const resetSignup = async (req, res) => {
   try {
