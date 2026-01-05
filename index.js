@@ -312,6 +312,15 @@ app.get("/", (_req, res) => {
   res.json({ ok: true, msg: "Root alive. Use /api/health" });
 });
 
+app.get("/test-mail", async (req, res) => {
+  await transporter.sendMail({
+    from: `Aselary Test <${process.env.GMAIL_USER}>`,
+    to: process.env.GMAIL_USER,
+    subject: "SMTP OK",
+    text: "If you see this, email works",
+  });
+  res.send("sent");
+});
 
 
 // 🏃‍♂️ Server
