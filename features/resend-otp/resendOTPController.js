@@ -1,5 +1,5 @@
 import User from "../models/User.js";
-import { transporter } from "../../config/mailer.js";
+import  transporter  from "../../config/mailer.js";
 
 
 export const resendEmailOTP = async (req, res) => {
