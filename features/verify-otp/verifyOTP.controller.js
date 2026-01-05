@@ -55,3 +55,25 @@ export const verifyEmail = async (req, res) => {
       .json({ message: "Server error. Try again." });
   }
 };
+
+
+
+
+// controllers/auth/resetSignup.controller.js
+export const resetSignup = async (req, res) => {
+  const { email, phoneNumber } = req.body;
+
+  if (!email && !phoneNumber) {
+    return res.status(400).json({ message: "Email or phone required" });
+  }
+
+  await User.deleteOne({
+    tempUser: true,
+    $or: [
+      email ? { email } : null,
+      phoneNumber ? { phoneNumber } : null,
+    ].filter(Boolean),
+  });
+
+  return res.json({ message: "Signup reset successful" });
+};

@@ -39,7 +39,7 @@ export const generateResetOTP = async (req, res) => {
     pass: process.env.GMAIL_PASS,
   },
    tls: {
-    rejectUnauthorized: isDev,
+    rejectUnauthorized: false,
     },
       connectionTimeout: 60000,
 });           // PROD = strict TLS

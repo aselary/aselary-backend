@@ -38,7 +38,6 @@ if (fullName.trim().split(" ").length < 2) {
 // --- FORCE BLOCK CAPITAL LETTERS ---
 const formattedFullName = fullName.trim().toUpperCase();
 
-
     // ---------------------------
     // 3) CHECK REAL DUPLICATES
     // ---------------------------

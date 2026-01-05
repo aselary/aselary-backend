@@ -17,20 +17,9 @@ export const transporter = nodemailer.createTransport({
     pass: process.env.GMAIL_PASS, // MUST be Gmail App Password
   },
   tls: {
-    rejectUnauthorized: !isDev, // ✅ strict in production
+    rejectUnauthorized: false, // ✅ strict in production
   },
   connectionTimeout: 60_000,
   greetingTimeout: 30_000,
 });
 
-/**
- * Verify transporter ONLY in development
- * Never block or crash production startup
- */
-transporter.verify()
-  .then(() => {
-    console.log("📧 Email transporter ready");
-  })
-  .catch((err) => {
-    console.error("❌ Email transporter FAILED:", err.message);
-  });
