@@ -1,6 +1,4 @@
 import User from "../models/User.js";
-import { ensureWalletForUser } from "../services/ensureWalletForUser.js";
-import isDev from "../utils/isDev.js";
 import sendSMS from "../utils/sendSMS.js";
 
 export const generatePhoneOTP = async (req, res) => {
@@ -16,7 +14,6 @@ export const generatePhoneOTP = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
      
-    await ensureWalletForUser(user)
     
     // ✅ SKIP FLOW
     if (skip === true) {

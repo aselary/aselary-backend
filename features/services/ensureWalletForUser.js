@@ -4,86 +4,59 @@ import { generateAliasAccountNumber } from "../utils/generateAliasAccountNumber.
 import {
   createPaystackCustomer,
   createDedicatedAccount,
-} from "../stack/paystack.contoller.js";
+} from "../stack/paystack.controller.js";
 
-/**
- * ENSURE USER HAS:
- * - Wallet
- * - Internal NUBAN
- * - Alias account number
- * - Paystack customer
- * - Paystack DVA
- *
- * ⚠️ This function is SAFE to call multiple times.
- */
+
 export async function ensureWalletForUser(user) {
-  // -----------------------------
-  // 1️⃣ ENSURE WALLET EXISTS
-  // -----------------------------
+  let walletChanged = false;
+  let userChanged = false;
+
+  // 1. Ensure wallet exists
   let wallet = await Wallet.findOne({ userId: user._id });
 
   if (!wallet) {
-    wallet = await Wallet.create({
+    wallet = new Wallet({
       userId: user._id,
       balance: 0,
+      provider: "ASELARY SMARTSAVE",
     });
+    await wallet.save();
   }
 
-  // -----------------------------
-  // 2️⃣ ENSURE INTERNAL NUBAN
-  // -----------------------------
-  if (!user.internalNuban) {
-    const internalNuban = await generateInternalNuban();
-    user.internalNuban = internalNuban;
-  }
-
+  // 2. Internal NUBAN (WALLET ONLY)
   if (!wallet.internalNuban) {
-    wallet.internalNuban = user.internalNuban;
-    await wallet.save();
+    wallet.internalNuban = generateInternalNuban();
+    walletChanged = true;
   }
 
-  // -----------------------------
-  // 3️⃣ ENSURE ALIAS ACCOUNT NUMBER
-  // (PHONE-BASED)
-  // -----------------------------
-  if (!wallet.accountNumber && user.phoneNumber) {
-    const accountNumber = generateAliasAccountNumber(user.phoneNumber);
-    wallet.accountNumber = accountNumber;
-    await wallet.save();
+  // 3. Alias account number (wallet + user)
+  if (!wallet.accountNumber) {
+    const seed = user.phoneNumber || user._id.toString();
+    const alias = generateAliasAccountNumber(seed);
 
-    // keep user document in sync
-    user.accountNumber = accountNumber;
+    wallet.accountNumber = alias;
+    user.accountNumber = alias;
+
+    walletChanged = true;
+    userChanged = true;
   }
 
-  // -----------------------------
-  // 4️⃣ ENSURE PAYSTACK CUSTOMER
-  // -----------------------------
+  // 4. Paystack customer (USER)
   let customerCode = user.paystackCustomerCode;
-
   if (!customerCode) {
     customerCode = await createPaystackCustomer(user);
-
-    // 🔥 THIS SAVE IS CRITICAL
     user.paystackCustomerCode = customerCode;
-    await user.save();
+    userChanged = true;
   }
 
-  // -----------------------------
-  // 5️⃣ ENSURE PAYSTACK DVA
-  // -----------------------------
+  // 5. Paystack DVA (USER)
   const hasValidDVA =
     user.paystackDVA &&
     user.paystackDVA.accountNumber &&
-    user.paystackDVA.bankName &&
-    user.paystackDVA.accountName &&
     user.paystackDVA.provider === "paystack";
 
   if (!hasValidDVA) {
     const dva = await createDedicatedAccount(customerCode);
-
-    if (!dva || !dva.accountNumber) {
-      throw new Error("Failed to create Paystack DVA");
-    }
 
     user.paystackDVA = {
       accountNumber: dva.accountNumber,
@@ -92,12 +65,13 @@ export async function ensureWalletForUser(user) {
       provider: "paystack",
     };
 
-    await user.save();
+    userChanged = true;
   }
 
-  // -----------------------------
-  // DONE
-  // -----------------------------
+  // 6. Save
+  if (walletChanged) await wallet.save();
+  if (userChanged) await user.save();
+
   return {
     wallet,
     aliasAccountNumber: wallet.accountNumber,
