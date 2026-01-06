@@ -1,5 +1,5 @@
 import User from "../models/User.js";
-import  transporter  from "../../config/mailer.js";
+import { sendEmail }  from "../../config/mailer.js";
 
 
 export const resendEmailOTP = async (req, res) => {
@@ -28,8 +28,7 @@ export const resendEmailOTP = async (req, res) => {
     await user.save();
 
     // Send new OTP
-    const mailOptions = {
-      from: `Aselary Login Assistance <${process.env.GMAIL_USER}>`,
+    await sendEmail({
       to: email,
       subject: "Your New Aselary Verification Code",
       html: `
@@ -102,14 +101,12 @@ export const resendEmailOTP = async (req, res) => {
 
   <!-- Footer -->
   <p style="text-align: center; font-size: 12px; color: #aaa; margin-top: 20px;">
-    © 2025 Aselary SmartSave™. All rights reserved.
+    © 2026 Aselary SmartSave™. All rights reserved.
   </p>
 
 </div>
       `,
-    };
-
-    await transporter.sendMail(mailOptions);
+    })
 
     return res.status(200).json({
       message: "A new OTP has been sent to your email.",

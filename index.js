@@ -8,7 +8,6 @@ import cors from "cors";
 import helmet from "helmet";           // For security
 import rateLimit from "express-rate-limit"; // Rate limiter  
 import isDev from "./features/utils/isDev.js"; 
-import  transporter  from "./config/mailer.js";
 import paystackWebhookRoute from "./features/stack/paystackWebhook.route.js";     
 import signupRoutes from "./features/signup/signup.routes.js"; // Signup feature
 import signinRoutes from "./features/signin/signin.routes.js"; //Signin feature
@@ -313,15 +312,6 @@ app.get("/", (_req, res) => {
   res.json({ ok: true, msg: "Root alive. Use /api/health" });
 });
 
-app.get("/test-mail", async (req, res) => {
-  await transporter.sendMail({
-    from: `Aselary Test <${process.env.GMAIL_USER}>`,
-    to: process.env.GMAIL_USER,
-    subject: "SMTP OK",
-    text: "If you see this, email works",
-  });
-  res.send("sent");
-});
 
 
 // 🏃‍♂️ Server

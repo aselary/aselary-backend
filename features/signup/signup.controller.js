@@ -2,7 +2,7 @@ import "../../loadENV.js";
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import  transporter  from "../../config/mailer.js";
+import { sendEmail } from "../../config/mailer.js";
 import { validatePersonalName } from "../utils/validatePersonalName.js"; 
 import isDev from "../utils/isDev.js";
 
@@ -95,10 +95,10 @@ await newUser.save();
       { expiresIn: "15m" }
     );
 
-
+    
+try {
     // 7) Send OTP email (same mail format you already have)
-    const mailOptions = {
-      from: `Verify Email Assistance <noreply@aselarydm.com>`,
+    await sendEmail({
       to: email,
       subject: "Your Aselary Verification Code",
       html: `<div style="max-width: 480px; margin: auto; font-family: Arial, sans-serif; padding: 20px;">
@@ -170,14 +170,15 @@ await newUser.save();
 
   <!-- Footer -->
   <p style="text-align: center; font-size: 12px; color: #aaa; margin-top: 20px;">
-    © 2025 Aselary SmartSave™. All rights reserved.
+    © 2026 Aselary SmartSave™. All rights reserved.
   </p>
 
 </div>`,
-    };
+    });
 
-transporter.sendMail(mailOptions)
-  .catch(err => console.error("OTP EMAIL FAILED:", err.message));
+ } catch (err) {
+  console.error("OTP EMAIL FAILED:", err.message);
+}
 
 // 4. ALWAYS return success
 return res.status(201).json({

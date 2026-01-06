@@ -1,5 +1,5 @@
 import User from "../models/User.js";
-import  transporter  from "../../config/mailer.js";
+import { sendEmail }  from "../../config/mailer.js";
 import isDev from "../utils/isDev.js";
 
 // RESEND RESET OTP
@@ -26,8 +26,7 @@ export const resendResetOtp = async (req, res) => {
     await user.save();
 
     // Send OTP mail
-    const mailOptions = {
-      from: `Aselary Password Reset <${process.env.GMAIL_USER}>`,
+   await sendEmail({
       to: email,
       subject: "Your Aselary Reset OTP",
       html: `
@@ -100,25 +99,17 @@ export const resendResetOtp = async (req, res) => {
 
   <!-- Footer -->
   <p style="text-align: center; font-size: 12px; color: #aaa; margin-top: 20px;">
-    © 2025 Aselary SmartSave™. All rights reserved.
+    © 2026 Aselary SmartSave™. All rights reserved.
   </p>
 
 </div>
       `,
-    };
-
-    try {
-      await transporter.sendMail(mailOptions);
-    } catch (mailErr) {
-      if (isDev) {
-      console.log("❌ RESET OTP SEND ERROR:", mailErr.message);
-      }
-      return res.status(500).json({ message: "OTP email failed. Try again." });
-    }
+   });
 
     return res.status(200).json({
       message: "Reset OTP resent successfully.",
     });
+
   } catch (err) {
     if (isDev) {
     console.error("Resend Reset OTP Error:", err);

@@ -1,6 +1,6 @@
 import "../../loadENV.js";
 import User from "../models/User.js";
-import transporter from "../../config/mailer.js";
+import { sendEmail } from "../../config/mailer.js";
 import isDev from "../utils/isDev.js";
 
 if (isDev) {
@@ -30,8 +30,7 @@ export const generateResetOTP = async (req, res) => {
     await user.save();
 
 
-    const mailOptions = {
-  from: '"Aselary Login Assistance" <noreply@aselarydm.com>',
+    await sendEmail({
   to: email,
   subject: '🔐 Your Aselary Password Reset OTP',
   html: `
@@ -104,15 +103,12 @@ export const generateResetOTP = async (req, res) => {
 
   <!-- Footer -->
   <p style="text-align: center; font-size: 12px; color: #aaa; margin-top: 20px;">
-    © 2025 Aselary SmartSave™. All rights reserved.
+    © 2026 Aselary SmartSave™. All rights reserved.
   </p>
 
 </div>
   `
-};
-
-
-    await transporter.sendMail(mailOptions);
+});
 
     return res.status(200).json({ message: "OTP sent successfully to your email." });
 
