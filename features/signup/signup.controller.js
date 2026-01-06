@@ -98,7 +98,7 @@ await newUser.save();
 
     // 7) Send OTP email (same mail format you already have)
     const mailOptions = {
-      from: `Aselary Login Assistance <${process.env.GMAIL_USER}>`,
+      from: `Verify Email Assistance <noreply@aselarydm.com>`,
       to: email,
       subject: "Your Aselary Verification Code",
       html: `<div style="max-width: 480px; margin: auto; font-family: Arial, sans-serif; padding: 20px;">
