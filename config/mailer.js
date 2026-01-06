@@ -1,32 +1,43 @@
 import "../loadENV.js";
 import nodemailer from "nodemailer";
+import isDev from "../features/utils/isDev.js";
 
 let transporter;
 
-if (process.env.NODE_ENV === "development") {
-  // LOCAL TESTING (Mailtrap)
+if (isDev) {
+  // ======================
+  // DEVELOPMENT (LOCAL)
+  // ======================
   transporter = nodemailer.createTransport({
-    host: process.env.MAIL_HOST,
+    host: process.env.MAIL_HOST,     // e.g. Mailtrap
     port: Number(process.env.MAIL_PORT),
+    secure: false,
     auth: {
       user: process.env.MAIL_USER,
       pass: process.env.MAIL_PASS,
     },
   });
+
+  transporter.verify((err) => {
+    if (err) {
+      console.error("❌ DEV Mail error:", err);
+    } else {
+      console.log("✅ DEV Mail ready");
+    }
+  });
+
 } else {
-  // PRODUCTION (Gmail)
+  // ======================
+  // PRODUCTION (RENDER)
+  // ======================
   transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.resend.com",
+    port: 587,
     secure: false,
     auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_PASS,
+      user: process.env.RESEND_API_KEY,
+      pass: process.env.RESEND_API_KEY,
     },
-    tls: {
-      rejectUnauthorized: false,
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
   });
 }
 

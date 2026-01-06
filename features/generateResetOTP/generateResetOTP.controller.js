@@ -1,6 +1,6 @@
 import "../../loadENV.js";
 import User from "../models/User.js";
-import nodemailer from "nodemailer";
+import transporter from "../../config/mailer.js";
 import isDev from "../utils/isDev.js";
 
 if (isDev) {
@@ -29,20 +29,6 @@ export const generateResetOTP = async (req, res) => {
     user.resetOTPExpiry = otpExpiry;
     await user.save();
 
-    // Setup nodemailer transporter
-   const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS,
-  },
-   tls: {
-    rejectUnauthorized: false,
-    },
-      connectionTimeout: 60000,
-});           // PROD = strict TLS
 
     const mailOptions = {
   from: '"Aselary Login Assistance" <noreply@aselarydm.com>',
