@@ -82,8 +82,8 @@ if (pendingTx) {
     body: JSON.stringify({
       email: user.email,
       amount: amount * 100,
-      callback_url: "https://retrieve-warming-vacations-throat.trycloudflare.com/paystack",
       metadata: {
+        userId: userId.toString(),
         internalRef,
       },
     }),

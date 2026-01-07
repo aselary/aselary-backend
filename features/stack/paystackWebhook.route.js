@@ -30,9 +30,11 @@ router.post(
       const accountNumber = data?.account?.account_number;
       if (!accountNumber) return res.sendStatus(200);
 
-      const user = await User.findOne({
-        "paystackDVA.accountNumber": accountNumber,
-      });
+    const userId = data?.metadata?.userId;
+if (!userId) return res.sendStatus(200);
+
+const user = await User.findById(userId);
+if (!user) return res.sendStatus(200);
 
       if (!user) return res.sendStatus(200);
 

@@ -67,6 +67,7 @@ const response = await fetch(
       amount: koboAmount,
       channels: ["ussd"], // or ["card"]
       metadata:{
+        userId: userId.toString(),
         internalRef,
       },
     }),
