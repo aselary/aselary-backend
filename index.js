@@ -143,7 +143,7 @@ app.use('/api/admin', rateLimit({
 // 🧠 Rate limiter
 const limiter = rateLimit({
   windowMs: isProd ? 15 * 60 * 1000 : 1 * 60 * 1000, // 15 min prod | 1 min dev
-  max: isProd ? 5 : 100, // 5 attempts prod | 100 dev
+  max: isProd ? 300 : 1000, // 5 attempts prod | 100 dev
   standardHeaders: true,
   legacyHeaders: false,
    message: { 
