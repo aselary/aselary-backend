@@ -29,11 +29,13 @@ router.post(
         console.log("EVENT:", event.event);
 
       const data = event.data;
+      console.log("RAW DATA:", JSON.stringify(data, null, 2));
      // 1️⃣ Get account number from Paystack event
-const accountNumber = data?.account?.account_number;
-if (!accountNumber) return res.sendStatus(200);
+const accountNumber =
+  data?.account?.account_number ||
+  data?.authorization?.receiver_bank_account_number ||
+  data?.authorization?.account_number;
 
-// 2️⃣ Find user by Paystack Dedicated Account number
 const user = await User.findOne({
   "paystackDVA.accountNumber": accountNumber,
 });
