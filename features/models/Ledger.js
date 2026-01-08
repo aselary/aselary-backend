@@ -31,7 +31,7 @@ const ledgerSchema = new mongoose.Schema(
 
     source: {
       type: String,
-      enum: ["DEPOSIT", "WITHDRAWAL", "A2A", "REVERSAL", "CHARGE", "TO_BANK", "TO_BANK_REVERSAL"],
+      enum: ["DEPOSIT", "WITHDRAWAL", "A2A", "REVERSAL", "CHARGE", "TO_BANK", "TO_BANK_REVERSAL", "paystack"],
       required: true,
     },
 

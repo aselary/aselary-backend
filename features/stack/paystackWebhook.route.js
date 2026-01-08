@@ -1,8 +1,8 @@
 import express from "express";
 import crypto from "crypto";
 import User from "../models/User.js";
-import Ledger from "../models/Ledger.js";
 import Wallet from "../models/Wallet.js";
+import Ledger from "../models/Ledger.js";
 
 const router = express.Router();
 
@@ -11,81 +11,131 @@ router.post(
   express.raw({ type: "application/json" }),
   async (req, res) => {
     console.log("🔥 PAYSTACK WEBHOOK HIT");
+
     try {
+      /* -------------------------------------------------
+       * 1. VERIFY PAYSTACK SIGNATURE
+       * ------------------------------------------------- */
       const hash = crypto
         .createHmac("sha512", process.env.PAYSTACK_SECRET_KEY)
         .update(req.body)
         .digest("hex");
 
       if (hash !== req.headers["x-paystack-signature"]) {
+        console.log("❌ Invalid Paystack signature");
         return res.sendStatus(401);
       }
 
+      /* -------------------------------------------------
+       * 2. PARSE EVENT
+       * ------------------------------------------------- */
       const event = JSON.parse(req.body.toString());
 
       if (event.event !== "charge.success") {
         return res.sendStatus(200);
       }
-        console.log("EVENT:", event.event);
+
+      console.log("EVENT:", event.event);
 
       const data = event.data;
       console.log("RAW DATA:", JSON.stringify(data, null, 2));
-     // 1️⃣ Get account number from Paystack event
-const accountNumber =
-  data?.account?.account_number ||
-  data?.authorization?.receiver_bank_account_number ||
-  data?.authorization?.account_number;
 
-const user = await User.findOne({
-  "paystackDVA.accountNumber": accountNumber,
-});
-if (!user) return res.sendStatus(200);
+      /* -------------------------------------------------
+       * 3. EXTRACT RECEIVER ACCOUNT NUMBER (BANK TRANSFER)
+       * ------------------------------------------------- */
+      const accountNumber =
+        data?.metadata?.receiver_account_number ||
+        data?.authorization?.receiver_bank_account_number ||
+        data?.authorization?.account_number;
 
-// 3️⃣ Get user's wallet
-const wallet = await Wallet.findOneAndUpdate(
-  { userId: user._id },
-  { $setOnInsert: { balance: 0 } },
-  { upsert: true, new: true }
-);
-if (!wallet) return res.sendStatus(200);
+      if (!accountNumber) {
+        console.log("❌ No receiver account number found");
+        return res.sendStatus(200);
+      }
 
-// 4️⃣ Prevent duplicate credit
-const exists = await Ledger.findOne({
-  reference: data.reference,
-  source: "PAYSTACK",
-});
-if (exists) return res.sendStatus(200);
+      /* -------------------------------------------------
+       * 4. FIND USER BY PAYSTACK DVA
+       * ------------------------------------------------- */
+      const user = await User.findOne({
+        "paystackDVA.accountNumber": accountNumber,
+      });
 
-// 5️⃣ Convert amount from kobo to naira
-const amount = data.amount / 100;
+      if (!user) {
+        console.log("❌ User not found for account:", accountNumber);
+        return res.sendStatus(200);
+      }
 
-// 6️⃣ Credit wallet
-wallet.balance += amount;
-await wallet.save();
+      /* -------------------------------------------------
+       * 5. FIND OR CREATE WALLET
+       * ------------------------------------------------- */
+      let wallet = await Wallet.findOne({ userId: user._id });
 
+      if (!wallet) {
+        wallet = await Wallet.create({
+          userId: user._id,
+          balance: 0,
+          internalNuban: accountNumber,
+          accountNumber,
+        });
+      }
 
-console.log("ACCOUNT NUMBER:", accountNumber);
-console.log("USER FOUND:", !!user);
-console.log("WALLET FOUND:", !!wallet);
-console.log("DUPLICATE LEDGER:", !!exists);
-console.log("AMOUNT:", amount)
+      /* -------------------------------------------------
+       * 6. PREVENT DUPLICATE CREDIT
+       * ------------------------------------------------- */
+      const existing = await Ledger.findOne({
+        reference: data.reference,
+        source: "paystack",
+      });
 
-// 7️⃣ Create ledger record
-await Ledger.create({
-  userId: user._id,
-  type: "credit",
-  amount,
-  reference: data.reference,
-  source: "PAYSTACK",
-  narration: "Paystack bank transfer",
-  status: "success",
-});
+      if (existing) {
+        console.log("⚠️ Duplicate transaction ignored");
+        return res.sendStatus(200);
+      }
 
-// 8️⃣ Acknowledge Paystack
-return res.sendStatus(200);
-    } catch (err) {
-      console.error("Paystack webhook error:", err);
+      /* -------------------------------------------------
+       * 7. CREDIT WALLET
+       * ------------------------------------------------- */
+      const amount = data.amount / 100;
+
+      const balanceBefore = wallet.balance;
+      wallet.balance += amount;
+      await wallet.save();
+      const balanceAfter = wallet.balance;
+
+      console.log("ACCOUNT NUMBER:", accountNumber);
+      console.log("USER FOUND:", true);
+      console.log("WALLET FOUND:", true);
+      console.log("AMOUNT:", amount);
+
+      /* -------------------------------------------------
+       * 8. CREATE LEDGER (MATCH SCHEMA EXACTLY)
+       * ------------------------------------------------- */
+      await Ledger.create({
+        userId: user._id,
+        walletId: wallet._id,
+
+        accountNumber,
+        internalNuban: wallet.internalNuban,
+
+        type: "CREDIT",          // MUST match enum
+        source: "paystack",      // MUST match enum
+
+        amount,
+        balanceBefore,
+        balanceAfter,
+
+        reference: data.reference,
+        narration: "Paystack bank transfer",
+        status: "success",
+      });
+
+      /* -------------------------------------------------
+       * 9. ACKNOWLEDGE PAYSTACK
+       * ------------------------------------------------- */
       return res.sendStatus(200);
+    } catch (err) {
+      console.error("❌ Paystack webhook error:", err);
+      return res.sendStatus(200); // NEVER fail webhook
     }
   }
 );
