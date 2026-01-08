@@ -12,7 +12,6 @@ router.post(
   async (req, res) => {
     console.log("🔥 PAYSTACK WEBHOOK HIT");
     try {
-  console.log("EVENT:", event.event);
 console.log("ACCOUNT NUMBER:", accountNumber);
 console.log("USER FOUND:", !!user);
 console.log("WALLET FOUND:", !!wallet);
@@ -32,6 +31,7 @@ console.log("AMOUNT:", amount);
       if (event.event !== "charge.success") {
         return res.sendStatus(200);
       }
+        console.log("EVENT:", event.event);
 
       const data = event.data;
      // 1️⃣ Get account number from Paystack event
