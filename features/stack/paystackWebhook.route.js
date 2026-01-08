@@ -12,6 +12,12 @@ router.post(
   async (req, res) => {
     console.log("🔥 PAYSTACK WEBHOOK HIT");
     try {
+  console.log("EVENT:", event.event);
+console.log("ACCOUNT NUMBER:", accountNumber);
+console.log("USER FOUND:", !!user);
+console.log("WALLET FOUND:", !!wallet);
+console.log("DUPLICATE LEDGER:", !!exists);
+console.log("AMOUNT:", amount);
       const hash = crypto
         .createHmac("sha512", process.env.PAYSTACK_SECRET_KEY)
         .update(req.body)
