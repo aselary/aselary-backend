@@ -42,7 +42,11 @@ const user = await User.findOne({
 if (!user) return res.sendStatus(200);
 
 // 3️⃣ Get user's wallet
-const wallet = await Wallet.findOne({ userId: user._id });
+const wallet = await Wallet.findOneAndUpdate(
+  { userId: user._id },
+  { $setOnInsert: { balance: 0 } },
+  { upsert: true, new: true }
+);
 if (!wallet) return res.sendStatus(200);
 
 // 4️⃣ Prevent duplicate credit
