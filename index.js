@@ -125,7 +125,10 @@ app.use(
   })
 );
 // ⚠️ Paystack webhook MUST come BEFORE express.json()
-app.use("/api/webhook", express.raw({ type: "application/json" }), paystackWebhookRoute);
+app.post("/paystack/webhook", express.raw({ type: "application/json" }), paystackWebhookRoute);
+
+
+
 app.post("/webhook", express.raw({ type: "application/json" }), ussdWebhook);
 app.post("/transfer/webhook", express.raw({ type: "*/*" }), transferWebhook);
 

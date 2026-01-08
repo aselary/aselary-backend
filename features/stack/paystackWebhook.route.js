@@ -7,9 +7,10 @@ import Wallet from "../models/Wallet.js";
 const router = express.Router();
 
 router.post(
-  "/paystack",
+  "/",
   express.raw({ type: "application/json" }),
   async (req, res) => {
+    console.log("🔥 PAYSTACK WEBHOOK HIT");
     try {
       const hash = crypto
         .createHmac("sha512", process.env.PAYSTACK_SECRET_KEY)
