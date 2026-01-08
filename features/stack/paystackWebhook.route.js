@@ -27,41 +27,47 @@ router.post(
       }
 
       const data = event.data;
-      const accountNumber = data?.account?.account_number;
-      if (!accountNumber) return res.sendStatus(200);
+     // 1️⃣ Get account number from Paystack event
+const accountNumber = data?.account?.account_number;
+if (!accountNumber) return res.sendStatus(200);
 
-    const userId = data?.metadata?.userId;
-if (!userId) return res.sendStatus(200);
-
-const user = await User.findById(userId);
+// 2️⃣ Find user by Paystack Dedicated Account number
+const user = await User.findOne({
+  "paystackDVA.accountNumber": accountNumber,
+});
 if (!user) return res.sendStatus(200);
 
-      if (!user) return res.sendStatus(200);
+// 3️⃣ Get user's wallet
+const wallet = await Wallet.findOne({ userId: user._id });
+if (!wallet) return res.sendStatus(200);
 
-      const exists = await Ledger.findOne({
-        reference: data.reference,
-        source: "PAYSTACK",
-      });
+// 4️⃣ Prevent duplicate credit
+const exists = await Ledger.findOne({
+  reference: data.reference,
+  source: "PAYSTACK",
+});
+if (exists) return res.sendStatus(200);
 
-      if (exists) return res.sendStatus(200);
+// 5️⃣ Convert amount from kobo to naira
+const amount = data.amount / 100;
 
-      const amount = data.amount / 100;
+// 6️⃣ Credit wallet
+wallet.balance += amount;
+await wallet.save();
 
-      await Ledger.create({
-        user: user._id,
-        type: "CREDIT",
-        amount,
-        reference: data.reference,
-        source: "PAYSTACK",
-        narration: "Paystack deposit",
-      });
+// 7️⃣ Create ledger record
+await Ledger.create({
+  userId: user._id,
+  type: "credit",
+  amount,
+  reference: data.reference,
+  source: "PAYSTACK",
+  narration: "Paystack bank transfer",
+  status: "success",
+});
 
-      await Wallet.findOneAndUpdate(
-        { userId: user._id },
-        { $inc: { balance: amount } }
-      );
-
-      return res.sendStatus(200);
+// 8️⃣ Acknowledge Paystack
+return res.sendStatus(200);
     } catch (err) {
       console.error("Paystack webhook error:", err);
       return res.sendStatus(200);
