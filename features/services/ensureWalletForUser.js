@@ -11,15 +11,18 @@ export async function ensureWalletForUser(user) {
   // -----------------------------
   // 1️⃣ ENSURE WALLET EXISTS
   // -----------------------------
-  let wallet = await Wallet.findOne({ userId: user._id });
-
-  if (!wallet) {
-    wallet = await Wallet.create({
+const wallet = await Wallet.findOneAndUpdate(
+  { userId: user._id },
+  {
+    $setOnInsert: {
       userId: user._id,
       balance: 0,
-    });
-  }
-
+      bankName: "Aselary Wallet",
+      provider: "ASELARY SMARTSAVE",
+    },
+  },
+  { upsert: true, new: true }
+);
   // -----------------------------
   // 2️⃣ ENSURE INTERNAL NUBAN
   // -----------------------------
