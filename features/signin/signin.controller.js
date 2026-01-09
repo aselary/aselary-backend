@@ -2,7 +2,7 @@ import User from '../models/User.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import isDev from '../utils/isDev.js';
-import { ensureWalletForUser } from '../services/ensureWalletForUser.js';
+
 
 const signin = async (req, res) => {
   try {
