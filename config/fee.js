@@ -19,7 +19,8 @@ export const A2A_FEES = [
 ];
 
 export const TO_BANK_FEES = [
-  { min: 1, max: 5000, fee: 20 },
+  { min: 1, max: 100, fee: 0 },
+  { min: 200, max: 5000, fee: 20 },
   { min: 5001, max: 10000, fee: 30 },
   { min: 10001, max: 20000, fee: 40 },
   { min: 20001, max: 30000, fee: 50 },
