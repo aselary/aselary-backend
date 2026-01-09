@@ -124,29 +124,9 @@ if (amount >= LIMITS.TO_BANK.cooldown.thresholdAmount) {
     }
 
     // 3️⃣ Balance check
-    if (wallet.balance < amount) {
+    if (wallet.balance < totalDebit) {
       return res.status(400).json({ message: "Insufficient balance" });
     }
-
-
-
-    // 8️⃣ Create ToBank Transaction (PENDING)
-    const toBankTxn = new ToBankTransaction({
-      userId,
-      walletId: wallet._id,
-      amount,
-      fee,
-      totalDebit,
-      bankName,
-      bankCode,
-      accountNumber,
-      accountName,
-      narration,
-      reference,
-      status: "PENDING",
-    });
-
-    await toBankTxn.save({ session });
 
   await ActivityLog.create(
   [
