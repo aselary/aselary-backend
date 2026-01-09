@@ -49,7 +49,7 @@ router.post(
       /* -------------------------------------------------
        * 3. EXTRACT RECEIVER ACCOUNT NUMBER (BANK TRANSFER)
        * ------------------------------------------------- */
-      const accountNumber =
+     let accountNumber =
         data?.metadata?.receiver_account_number ||
         data?.authorization?.receiver_bank_account_number ||
         data?.authorization?.account_number;
@@ -60,6 +60,15 @@ router.post(
         }
         return res.sendStatus(200);
       }
+
+       accountNumber =
+  data.authorization?.account_number ||
+  wallet.accountNumber ||
+  wallet.internalNuban;
+
+if (!accountNumber) {
+  throw new Error("Ledger failed: accountNumber missing");
+}
 
       /* -------------------------------------------------
        * 4. FIND USER BY PAYSTACK DVA
@@ -111,35 +120,40 @@ router.post(
       wallet.balance += amount;
       await wallet.save();
       const balanceAfter = wallet.balance;
-         if (isDev) {
+
+     
+         
       console.log("ACCOUNT NUMBER:", accountNumber);
       console.log("USER FOUND:", true);
       console.log("WALLET FOUND:", true);
       console.log("AMOUNT:", amount);
-         }
+         
 
       /* -------------------------------------------------
        * 8. CREATE LEDGER (MATCH SCHEMA EXACTLY)
        * ------------------------------------------------- */
-      await Ledger.create({
-        userId: user._id,
-        walletId: wallet._id,
+     await Ledger.create({
+  userId: user._id,
+  walletId: wallet._id,
 
-        accountNumber,
-        internalNuban,
+  accountNumber,
+  internalNuban,
 
-        type: "CREDIT",          // MUST match enum
-        source: "paystack",      // MUST match enum
+  type: "CREDIT",
+  source: "paystack",
 
-        amount,
-        balanceBefore,
-        balanceAfter,
+  amount,
+  balanceBefore,
+  balanceAfter,
 
-        reference: data.reference,
-        narration: "Paystack bank transfer",
-        status: "success",
-      });
+  reference: data.reference,
+  narration: "Paystack bank transfer",
 
+  metadata: {
+    provider: "paystack",
+    paidAt: data.paid_at,
+  },
+});
       await ActivityLog.create({
         userId: user._id,
         actorId: user._id,        // user performed the action
@@ -178,7 +192,7 @@ router.post(
       return res.sendStatus(200);
     } catch (err) {
       if (isDev) {
-      console.error("❌ Paystack webhook error:", err);
+      console.error("❌ LEDGER FAILURE:", err.message);
       }
       return res.sendStatus(200); // NEVER fail webhook
     }

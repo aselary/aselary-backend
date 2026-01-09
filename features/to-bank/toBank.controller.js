@@ -5,6 +5,7 @@ import ToBankTransaction from "../models/ToBankTransaction.js";
 import ActivityLog from "../models/ActivityLog.js";
 import Transaction from "../models/Transaction.js";
 import addPlatformFee from "../utils/addPlatformFee.js";
+import PlatformLedger from "../models/PlatformLedger.js";
 import { calculateFee } from "../utils/calculateFee.js";
 import { TO_BANK_FEES } from "../../config/fee.js";
 import { LIMITS } from "../../config/limits.js";
@@ -374,7 +375,23 @@ export const completeToBankTransfer = async (req, res) => {
         session
       );
     }
-
+       await PlatformLedger.create(
+  [
+    {
+      reference,
+      source: "TO_BANK",
+      type: "PLATFORM_FEE",
+      direction: "CREDIT",
+      amount: fee,
+      narration: "To Bank transfer service fee",
+      meta: {
+        userId,
+      },
+    },
+  ],
+  { session }
+);
+ 
     
     tx.status = "SUCCESS";
     tx.completedAt = new Date();

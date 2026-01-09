@@ -23,6 +23,7 @@ const ledgerSchema = new mongoose.Schema(
       type: String,
       required: true, // what user knows
     },
+    
     type: {
       type: String,
       enum: ["CREDIT", "DEBIT"],
