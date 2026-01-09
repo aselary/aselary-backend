@@ -42,10 +42,10 @@ export const toBankTransfer = async (req, res) => {
   return res.status(400).json({ message: "Invalid amount" });
  }
 
-  try {
-        // 4️⃣ Generate reference
-    const reference = `TB-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+         // 4️⃣ Generate reference
+   const reference = `TB-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+  try {
     const existing = await ToBankTransaction.findOne({
   userId,
   status: "PENDING",
