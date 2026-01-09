@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import Wallet from "../models/Wallet.js";
 import Ledger from "../models/Ledger.js";
 import ToBankTransaction from "../models/ToBankTransaction.js";
-import PlatformLedger from "../models/PlatformLedger.js";
 import ActivityLog from "../models/ActivityLog.js";
 import Transaction from "../models/Transaction.js";
 import addPlatformFee from "../utils/addPlatformFee.js";
@@ -135,6 +134,8 @@ if (amount >= LIMITS.TO_BANK.cooldown.thresholdAmount) {
       userId,
       walletId: wallet._id,
       amount,
+      fee,
+      totalDebit,
       bankName,
       bankCode,
       accountNumber,
@@ -165,7 +166,7 @@ if (amount >= LIMITS.TO_BANK.cooldown.thresholdAmount) {
       status: "PENDING",
 
       // ✅ NEW (authoritative meaning)
-      direction: "DEBIT",
+      direction: "OUTGOING",
       counterpartyName: accountName,
 
       // 🧱 OLD (kept, very important)
@@ -181,39 +182,6 @@ if (amount >= LIMITS.TO_BANK.cooldown.thresholdAmount) {
   { session }
 );
 
-    // 6️⃣ Debit wallet
-    wallet.balance -= totalDebit;
-    await wallet.save({ session });
-
-    // 7️⃣ Ledger (DEBIT)
- // 7b Platform fee credit
-await addPlatformFee({
-  source: "TO_BANK",
-  amount: fee,
-  reference,
-  userId,
-  narration: "To Bank transfer service fee",
-  direction: "CREDIT",
-  createdAt: new Date()
-});
-
-
-await PlatformLedger.create(
-  [
-    {
-      reference,
-      source: "TO_BANK",
-      type: "PLATFORM_FEE",
-      direction: "CREDIT",
-      amount: fee,
-      narration: "To Bank transfer service fee",
-      meta: {
-        userId,
-      },
-    },
-  ],
-  { session }
-);
 
 await Transaction.create(
   [
@@ -226,7 +194,7 @@ await Transaction.create(
       category: "TRANSFER",
       channel: "BANK_TRANSFER",
 
-      direction: "DEBIT",
+      direction: "OUTGOING",
 
       amount,
       fee: fee || 0,
@@ -309,66 +277,142 @@ await Transaction.create(
 }
 };
 
+
+
 export const completeToBankTransfer = async (req, res) => {
   const { reference } = req.body;
 
-  const tx = await ToBankTransaction.findOne({ reference });
-  if (!tx) {
-    return res.status(404).json({ message: "Transaction not found" });
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    
+    const tx = await ToBankTransaction.findOne({ reference }).session(session);
+
+    if (!tx) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: "Transaction not found" });
+    }
+
+    if (tx.status !== "PENDING") {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ message: "Transaction already resolved" });
+    }
+
+    
+    const wallet = await Wallet.findById(tx.walletId)
+      .select("balance internalNuban accountNumber")
+      .session(session);
+
+    if (!wallet) {
+      throw new Error("Wallet not found");
+    }
+
+    
+    const balanceBefore = wallet.balance;
+    const fee = tx.fee || 0;
+    const totalDebit = tx.amount + fee;
+
+    if (wallet.balance < totalDebit) {
+      throw new Error("Insufficient balance");
+    }
+
+    
+    wallet.balance -= totalDebit;
+    await wallet.save({ session });
+
+    const balanceAfter = wallet.balance;
+
+    await Ledger.create(
+      {
+        userId: tx.userId,
+        walletId: wallet._id,
+        internalNuban: wallet.internalNuban,
+        accountNumber: wallet.accountNumber,
+        type: "DEBIT",
+        source: "TO_BANK",
+        amount: tx.amount,
+        balanceBefore,
+        balanceAfter: balanceBefore - tx.amount,
+        narration: tx.narration,
+        reference,
+      },
+      { session }
+    );
+
+    
+    if (fee > 0) {
+      await Ledger.create(
+        {
+          userId: tx.userId,
+          walletId: wallet._id,
+          internalNuban: wallet.internalNuban,
+          type: "DEBIT",
+          source: "TO_BANK_FEE",
+          amount: fee,
+          balanceBefore: balanceBefore - tx.amount,
+          balanceAfter: balanceBefore - totalDebit,
+          narration: "Transfer service fee",
+          reference,
+        },
+        { session }
+      );
+
+      
+      await addPlatformFee(
+        {
+          source: "TO_BANK",
+          amount: fee,
+          reference,
+          userId: tx.userId,
+          narration: "To Bank transfer service fee",
+          direction: "CREDIT",
+          createdAt: new Date(),
+        },
+        session
+      );
+    }
+
+    
+    tx.status = "SUCCESS";
+    tx.completedAt = new Date();
+    await tx.save({ session });
+
+    
+    await ActivityLog.findOneAndUpdate(
+      { reference },
+      { status: "SUCCESS", completedAt: new Date() },
+      { session }
+    );
+
+ 
+    await Transaction.findOneAndUpdate(
+      { reference, status: "PENDING", type: "TO_BANK" },
+      { status: "SUCCESS", completedAt: new Date() },
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.json({
+      success: true,
+      message: "Transfer settled successfully",
+      reference,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+     if (isDev) {
+    console.error("COMPLETE TO BANK ERROR:", error);
+     }
+
+    return res.status(500).json({
+      message: error.message || "Internal server error",
+    });
   }
-
-  if (tx.status !== "PENDING") {
-    return res.status(400).json({ message: "Transaction already resolved" });
-  }
-
-  const wallet = await Wallet.findById(tx.walletId).select('+internalNuban');
-
-  // 🔐 1. Debit wallet NOW (real movement)
-  const balanceBefore = wallet.balance;
-
-  if (wallet.balance < tx.amount) {
-    return res.status(400).json({ message: "Insufficient balance" });
-  }
-
-  wallet.balance -= tx.amount;
-  await wallet.save();
-
-  // 🔐 2. Create ONE ledger entry
-  await Ledger.create({
-    userId: tx.userId,
-    walletId: wallet._id,
-    internalNuban: wallet.internalNuban,
-    accountNumber: wallet.accountNumber,
-    type: "DEBIT",
-    source: "TO_BANK",
-    amount: tx.amount,
-    balanceBefore,
-    balanceAfter: wallet.balance,
-    narration: tx.narration,
-    reference,
-  });
-
-  // 🔐 3. Mark transaction success
-  tx.status = "SUCCESS";
-  tx.completedAt = new Date();
-  await tx.save();
-
-  // 🔐 4. Update activity log
-  await ActivityLog.findOneAndUpdate(
-    { reference },
-    { status: "SUCCESS", completedAt: new Date() }
-  );
-
-   await Transaction.findOneAndUpdate(
-    { reference },
-    { status: "SUCCESS", completedAt: new Date() }
-  );
-
-  return res.json({
-    success: true,
-    message: "Transfer settled successfully",
-    reference,
-  });
 };
 
 export const failToBankTransfer = async (req, res) => {
@@ -388,66 +432,47 @@ export const failToBankTransfer = async (req, res) => {
 
     if (tx.status !== "PENDING") {
       return res.status(400).json({
-        message: "Transaction already resolved"
+        message: "Transaction already resolved",
       });
     }
 
-    // Fetch wallet
-    const wallet = await Wallet
-      .findById(tx.walletId)
-      .select('+internalNuban')
-      .session(session);
-
-    if (!wallet) {
-      throw new Error("Wallet not found");
-    }
-
-    // REFUND
-    wallet.balance += tx.amount;
-    await wallet.save({ session });
-
-    // UPDATE TX
+    // Mark failed
     tx.status = "FAILED";
     tx.failedAt = new Date();
     tx.failureReason = reason;
     await tx.save({ session });
 
     await ActivityLog.findOneAndUpdate(
-  { reference },
-  {
-    status: "FAILED",
-    reason,
-    completedAt: new Date(),
-  },
-  { session }
-);
+      { reference },
+      {
+        status: "FAILED",
+        reason,
+        completedAt: new Date(),
+      },
+      { session }
+    );
 
-  await Transaction.findOneAndUpdate(
-  { reference },
-  {
-    status: "FAILED",
-    reason,
-    completedAt: new Date(),
-  },
-  { session }
-);
+    await Transaction.findOneAndUpdate(
+      { reference },
+      {
+        status: "FAILED",
+        reason,
+        completedAt: new Date(),
+      },
+      { session }
+    );
 
     await session.commitTransaction();
 
     return res.json({
       success: true,
-      message: "Transfer failed and amount refunded",
+      message: "Transfer failed",
       reference,
-      updatedAt: tx.updatedAt,
     });
-
   } catch (err) {
     await session.abortTransaction();
-    if (isDev) {
-    console.error("FAIL TO BANK ERROR:", err);
-    }
     return res.status(500).json({
-      message: "Internal server error"
+      message: "Internal server error",
     });
   } finally {
     session.endSession();

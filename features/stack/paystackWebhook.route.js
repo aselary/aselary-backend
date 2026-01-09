@@ -3,6 +3,8 @@ import crypto from "crypto";
 import User from "../models/User.js";
 import Wallet from "../models/Wallet.js";
 import Ledger from "../models/Ledger.js";
+import ActivityLog from "../models/ActivityLog.js";
+import isDev from "../utils/isDev.js";
 
 const router = express.Router();
 
@@ -10,7 +12,9 @@ router.post(
   "/",
   express.raw({ type: "application/json" }),
   async (req, res) => {
+    if (isDev) {
     console.log("🔥 PAYSTACK WEBHOOK HIT");
+    }
 
     try {
       /* -------------------------------------------------
@@ -22,7 +26,6 @@ router.post(
         .digest("hex");
 
       if (hash !== req.headers["x-paystack-signature"]) {
-        console.log("❌ Invalid Paystack signature");
         return res.sendStatus(401);
       }
 
@@ -34,11 +37,14 @@ router.post(
       if (event.event !== "charge.success") {
         return res.sendStatus(200);
       }
-
+        if (isDev) {
       console.log("EVENT:", event.event);
+        }
 
       const data = event.data;
+      if (isDev) {
       console.log("RAW DATA:", JSON.stringify(data, null, 2));
+      }
 
       /* -------------------------------------------------
        * 3. EXTRACT RECEIVER ACCOUNT NUMBER (BANK TRANSFER)
@@ -49,7 +55,9 @@ router.post(
         data?.authorization?.account_number;
 
       if (!accountNumber) {
+        if (isDev) {
         console.log("❌ No receiver account number found");
+        }
         return res.sendStatus(200);
       }
 
@@ -61,7 +69,9 @@ router.post(
       });
 
       if (!user) {
+        if (isDev) {
         console.log("❌ User not found for account:", accountNumber);
+        }
         return res.sendStatus(200);
       }
 
@@ -101,11 +111,12 @@ router.post(
       wallet.balance += amount;
       await wallet.save();
       const balanceAfter = wallet.balance;
-
+         if (isDev) {
       console.log("ACCOUNT NUMBER:", accountNumber);
       console.log("USER FOUND:", true);
       console.log("WALLET FOUND:", true);
       console.log("AMOUNT:", amount);
+         }
 
       /* -------------------------------------------------
        * 8. CREATE LEDGER (MATCH SCHEMA EXACTLY)
@@ -115,7 +126,7 @@ router.post(
         walletId: wallet._id,
 
         accountNumber,
-        internalNuban: wallet.internalNuban,
+        internalNuban,
 
         type: "CREDIT",          // MUST match enum
         source: "paystack",      // MUST match enum
@@ -129,12 +140,46 @@ router.post(
         status: "success",
       });
 
+      await ActivityLog.create({
+        userId: user._id,
+        actorId: user._id,        // user performed the action
+        walletId: wallet._id,
+
+       // BUSINESS MEANING
+       category: "DEPOSIT",
+       channel: "BANK_TRANSFER",
+       type: "DEPOSIT",
+       direction: "CREDIT",
+
+      // MONEY
+       amount,
+       reference: data.reference,
+       status: "SUCCESS",
+
+      // OPTIONAL BUT GOOD
+       narration: "Paystack bank transfer",
+       counterpartyName: data.authorization?.bank || "Paystack",
+
+      // ENGINE LINKS (optional but future-proof)
+    engineRefs: {
+       ledgerId: null, // or ledger._id if you store it
+       depositTransactionId: null,
+    },
+
+    meta: {
+       provider: "paystack",
+       accountNumber,
+       paidAt: data.paid_at,
+    },
+});
       /* -------------------------------------------------
        * 9. ACKNOWLEDGE PAYSTACK
        * ------------------------------------------------- */
       return res.sendStatus(200);
     } catch (err) {
+      if (isDev) {
       console.error("❌ Paystack webhook error:", err);
+      }
       return res.sendStatus(200); // NEVER fail webhook
     }
   }

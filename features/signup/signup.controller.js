@@ -9,21 +9,19 @@ export const signup = async (req, res) => {
   try {
     const { fullName, email, password, phoneNumber } = req.body;
 
-    // ---------------------------
-    // 1) BASIC VALIDATION
-    // ---------------------------
+
     if (!fullName || !email || !password || !phoneNumber) {
       return res.status(400).json({ message: "All fields are required." });
     }
 
-    // --- FULL NAME VALIDATION ---
+
 if (fullName.trim().split(" ").length < 2) {
   return res.status(400).json({ 
     message: "Enter your full name (first and last name)."
   });
 }
 
- // 🔒 BLOCK BUSINESS NAMES HERE
+
     const nameCheck = validatePersonalName(fullName);
 
     if (!nameCheck.valid) {
@@ -33,17 +31,13 @@ if (fullName.trim().split(" ").length < 2) {
       });
     }
 
-// --- FORCE BLOCK CAPITAL LETTERS ---
+
 const formattedFullName = fullName.trim().toUpperCase();
 
 
-    // 4) HASH PASSWORD
-    // ---------------------------
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ---------------------------
-    // 3) CHECK REAL DUPLICATES
-    // ---------------------------
+
     const existing = await User.findOne({
       $or: [{ email }, { phoneNumber }],
     });

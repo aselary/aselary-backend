@@ -333,7 +333,7 @@ await creditLedger.save({ session });
     netAmount: amount,
 
     status: "SUCCESS",
-    reference,
+    reference: debitLedgerRef,
 
     counterpartyUserId: receiverWallet.userId,
     counterpartyName: receiverUser.fullName,
@@ -355,11 +355,11 @@ await creditLedger.save({ session });
 
     direction: "CREDIT",
     amount,
-    fee,
+    fee: 0,
     netAmount: amount,
 
     status: "SUCCESS",
-    reference,
+    reference: creditLedgerRef,
 
     counterpartyUserId: senderWallet.userId,
     counterpartyName: senderUser.fullName,

@@ -35,17 +35,6 @@ const signin = async (req, res) => {
   }); 
 }
 
-let bankData = null;
-
-try {
-  bankData = await ensureWalletForUser(user);
-} catch (error) {
-  if (isDev) {
-    console.error("ensureWalletForUser error:", error);
-  }
-  // NEVER block sign-in
-}
-
 
    const isProd = process.env.NODE_ENV === "production";
 

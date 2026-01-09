@@ -98,7 +98,7 @@ const activityLogSchema = new mongoose.Schema(
      */
     direction: {
       type: String,
-      enum: ["DEBIT", "CREDIT"],
+      enum: ["DEBIT", "CREDIT", "OUTGOING"],
       required: true,
       index: true,
     },

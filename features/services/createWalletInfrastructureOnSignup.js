@@ -7,25 +7,20 @@ import {
 } from "../stack/paystack.controller.js";
 
 
-export async function ensureWalletForUser(user) {
-  // -----------------------------
-  // 1️⃣ ENSURE WALLET EXISTS
-  // -----------------------------
-const wallet = await Wallet.findOneAndUpdate(
-  { userId: user._id },
-  {
-    $setOnInsert: {
+export async function createWalletInfrastructureOnSignup(user) {
+
+  let wallet = await Wallet.findOne({ userId: user._id });
+
+  if (!wallet) {
+    wallet = await Wallet.create({
       userId: user._id,
       balance: 0,
-      bankName: "Aselary Wallet",
-      provider: "ASELARY SMARTSAVE",
-    },
-  },
-  { upsert: true, new: true }
-);
-  // -----------------------------
-  // 2️⃣ ENSURE INTERNAL NUBAN
-  // -----------------------------
+      bankName,
+      provider,
+    });
+  }
+
+
   if (!user.internalNuban) {
     const internalNuban = await generateInternalNuban();
     user.internalNuban = internalNuban;
@@ -36,35 +31,24 @@ const wallet = await Wallet.findOneAndUpdate(
     await wallet.save();
   }
 
-  // -----------------------------
-  // 3️⃣ ENSURE ALIAS ACCOUNT NUMBER
-  // (PHONE-BASED)
-  // -----------------------------
-  if (!wallet.accountNumber && user.phoneNumber) {
+
+ if (!wallet.accountNumber && user.phoneNumber) {
     const accountNumber = generateAliasAccountNumber(user.phoneNumber);
     wallet.accountNumber = accountNumber;
     await wallet.save();
 
-    // keep user document in sync
     user.accountNumber = accountNumber;
   }
 
-  // -----------------------------
-  // 4️⃣ ENSURE PAYSTACK CUSTOMER
-  // -----------------------------
+
   let customerCode = user.paystackCustomerCode;
 
   if (!customerCode) {
     customerCode = await createPaystackCustomer(user);
-
-    // 🔥 THIS SAVE IS CRITICAL
     user.paystackCustomerCode = customerCode;
-    await user.save();
+     await user.save();
   }
 
-  // -----------------------------
-  // 5️⃣ ENSURE PAYSTACK DVA
-  // -----------------------------
   const hasValidDVA =
     user.paystackDVA &&
     user.paystackDVA.accountNumber &&
@@ -89,9 +73,7 @@ const wallet = await Wallet.findOneAndUpdate(
     await user.save();
   }
 
-  // -----------------------------
-  // DONE
-  // -----------------------------
+
   return {
     wallet,
     aliasAccountNumber: wallet.accountNumber,

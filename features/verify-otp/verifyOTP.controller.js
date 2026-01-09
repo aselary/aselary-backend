@@ -1,5 +1,6 @@
 import User from "../models/User.js";
 import isDev from "../utils/isDev.js";
+import { createWalletInfrastructureOnSignup } from "../services/createWalletInfrastructureOnSignup.js";
 
 export const verifyEmail = async (req, res) => {
   try {
@@ -42,10 +43,17 @@ export const verifyEmail = async (req, res) => {
 
     await user.save();
 
+// 🔐 CREATE WALLET + BANK INFRASTRUCTURE
+try {
+  await createWalletInfrastructureOnSignup(user);
+} catch (err) {
+}
+
     return res.status(200).json({
       message: "Email verified successfully.",
       userId: user._id,
     });
+
   } catch (error) {
     if (isDev) {
     console.error("VERIFY EMAIL ERROR:", error);
