@@ -1,7 +1,6 @@
 import User from "../models/User.js";
 import isDev from "../utils/isDev.js";
-import { ensureWalletForUser } from "../services/ensureWalletForUser.js";
-
+import { createWalletInfrastructureOnSignup } from "../services/createWalletInfrastructureOnSignup.js";
 
 
 export const verifyPhoneOTP = async (req, res) => {
@@ -40,7 +39,7 @@ user.status = "confirmed";
 
 
 // after OTP verification + user activation
-const bankData = await ensureWalletForUser(user);
+const bankData = await createWalletInfrastructureOnSignup(user);
 
 await user.save();
 

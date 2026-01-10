@@ -15,8 +15,8 @@ export async function createWalletInfrastructureOnSignup(user) {
     wallet = await Wallet.create({
       userId: user._id,
       balance: 0,
-      bankName,
-      provider,
+      bankName: "Aselary Wallet",
+      provider: "ASELARY SMARTSAVE",
     });
   }
 

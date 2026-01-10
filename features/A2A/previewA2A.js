@@ -4,7 +4,7 @@ import { A2A_FEES } from "../../config/fee.js";
 export const previewA2A = async (req, res) => {
   const { amount } = req.body;
 
-  if (!amount || amount < 90) {
+  if (!amount || amount < 99) {
     return res.status(400).json({ message: "Invalid amount" });
   }
 

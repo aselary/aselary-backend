@@ -42,47 +42,27 @@ router.post(
         }
 
       const data = event.data;
+      let accountNumber = null;
       if (isDev) {
       console.log("RAW DATA:", JSON.stringify(data, null, 2));
       }
 
       /* -------------------------------------------------
-       * 3. EXTRACT RECEIVER ACCOUNT NUMBER (BANK TRANSFER)
-       * ------------------------------------------------- */
-     let accountNumber =
-        data?.metadata?.receiver_account_number ||
-        data?.authorization?.receiver_bank_account_number ||
-        data?.authorization?.account_number;
-
-      if (!accountNumber) {
-        if (isDev) {
-        console.log("❌ No receiver account number found");
-        }
-        return res.sendStatus(200);
-      }
-
-       accountNumber =
-  data.authorization?.account_number ||
-  wallet.accountNumber ||
-  wallet.internalNuban;
-
-if (!accountNumber) {
-  throw new Error("Ledger failed: accountNumber missing");
-}
-
-      /* -------------------------------------------------
        * 4. FIND USER BY PAYSTACK DVA
        * ------------------------------------------------- */
-      const user = await User.findOne({
-        "paystackDVA.accountNumber": accountNumber,
-      });
+     const userId = data.metadata?.userId;
 
-      if (!user) {
-        if (isDev) {
-        console.log("❌ User not found for account:", accountNumber);
-        }
-        return res.sendStatus(200);
-      }
+if (!userId) {
+  console.log("❌ Missing userId in metadata");
+  return res.sendStatus(200);
+}
+
+const user = await User.findById(userId);
+
+if (!user) {
+  console.log("❌ User not found:", userId);
+  return res.sendStatus(200);
+}
 
       /* -------------------------------------------------
        * 5. FIND OR CREATE WALLET
@@ -128,10 +108,22 @@ if (!accountNumber) {
       console.log("WALLET FOUND:", true);
       console.log("AMOUNT:", amount);
          
+ const internalNuban = wallet.internalNuban || null;
+      
+let counterpartyName = "Paystack"; // default fallback
 
-      /* -------------------------------------------------
-       * 8. CREATE LEDGER (MATCH SCHEMA EXACTLY)
-       * ------------------------------------------------- */
+if (data.channel === "bank_transfer") {
+  const senderName = data.sender_name || "Unknown Sender";
+  const senderBank = data.sender_bank || "External Bank";
+  counterpartyName = `${senderBank} (${senderName})`;
+}
+else if (data.channel === "card") {
+  counterpartyName = `${data.authorization?.bank || data.authorization?.brand || "Card Payment"}`;
+}
+else if (data.channel === "ussd") {
+  counterpartyName = `${data.authorization?.bank || "USSD / Paystack"}`;
+}
+
      await Ledger.create({
   userId: user._id,
   walletId: wallet._id,
@@ -160,9 +152,9 @@ if (!accountNumber) {
         walletId: wallet._id,
 
        // BUSINESS MEANING
-       category: "DEPOSIT",
+       category: "TRANSFER",
        channel: "BANK_TRANSFER",
-       type: "DEPOSIT",
+       type: "TO_BANK",
        direction: "CREDIT",
 
       // MONEY
@@ -172,7 +164,7 @@ if (!accountNumber) {
 
       // OPTIONAL BUT GOOD
        narration: "Paystack bank transfer",
-       counterpartyName: data.authorization?.bank || "Paystack",
+       counterpartyName,
 
       // ENGINE LINKS (optional but future-proof)
     engineRefs: {

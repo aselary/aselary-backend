@@ -25,7 +25,16 @@ export const toBankTransfer = async (req, res) => {
       accountName,
       narration,
     } = req.body;
-
+    if (isDev) {
+ console.log("📦 STEP 1: BODY", {
+  amount,
+  bankName,
+  bankCode,
+  accountNumber,
+  accountName,
+  narration,
+});
+    }
     // 1️⃣ Validate input
     if (
       !amount ||
@@ -44,7 +53,10 @@ export const toBankTransfer = async (req, res) => {
 
          // 4️⃣ Generate reference
    const reference = `TB-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
+   if (isDev) {
+   console.log("🔖 STEP 2: REFERENCE =", reference);
+console.log("🔍 STEP 3: Checking pending transaction...");
+   }
   try {
     const existing = await ToBankTransaction.findOne({
   userId,
@@ -56,10 +68,15 @@ export const toBankTransfer = async (req, res) => {
     message: "You have a pending transfer. Please wait.",
   });
  }
+ if (isDev) {
+ console.log("📌 STEP 3 RESULT: existing =", existing);
+ }
 
     const fee = calculateFee(amount, TO_BANK_FEES);
     const totalDebit = amount + fee;
-
+    if (isDev) {
+     console.log("💸 STEP 4: fee & totalDebit", { fee, totalDebit });
+    }
 
 // 1️⃣ Per-transaction limit
 if (amount > LIMITS.TO_BANK.maxPerTransaction) {
@@ -116,18 +133,42 @@ if (amount >= LIMITS.TO_BANK.cooldown.thresholdAmount) {
   }
 }
 
+if (isDev) {
+   console.log("👛 STEP 5: Fetching wallet for userId =", userId);
+}
     // 2️⃣ Fetch wallet
     const wallet = await Wallet.findOne({ userId }).select('+internalNuban').session(session);
 
     if (!wallet) {
       return res.status(404).json({ message: "Wallet not found" });
     }
+    if (isDev) {
+    console.log("👛 STEP 5 RESULT: wallet =", wallet);
+    }
 
     // 3️⃣ Balance check
     if (wallet.balance < totalDebit) {
-      return res.status(400).json({ message: "Insufficient balance" });
+      return res.status(400).json({ message: `Insufficient balance. You need ₦${totalDebit}` });
     }
 
+
+    const toBankTxn = await ToBankTransaction.create(
+  [{
+    userId,
+    walletId: wallet._id,          // 🔥 REQUIRED
+    amount,
+    bankName,
+    bankCode,
+    accountNumber,
+    accountName,
+    reference,
+    status: "PENDING",
+  }],
+  { session }
+);
+  if (isDev) {
+console.log("📒 STEP 6: Creating ActivityLog...");
+  }
   await ActivityLog.create(
   [
     {
@@ -147,7 +188,7 @@ if (amount >= LIMITS.TO_BANK.cooldown.thresholdAmount) {
       status: "PENDING",
 
       // ✅ NEW (authoritative meaning)
-      direction: "OUTGOING",
+      direction: "DEBIT",
       counterpartyName: accountName,
 
       // 🧱 OLD (kept, very important)
@@ -162,7 +203,9 @@ if (amount >= LIMITS.TO_BANK.cooldown.thresholdAmount) {
   ],
   { session }
 );
-
+if (isDev) {
+console.log("✅ STEP 6 DONE: ActivityLog created");
+}
 
 await Transaction.create(
   [
@@ -175,7 +218,7 @@ await Transaction.create(
       category: "TRANSFER",
       channel: "BANK_TRANSFER",
 
-      direction: "OUTGOING",
+      direction: "DEBIT",
 
       amount,
       fee: fee || 0,
@@ -222,6 +265,13 @@ await Transaction.create(
       },
     });
    } catch (error) {
+
+   if (isDev) {
+     console.error("🔥 TO BANK CRASHED");
+  console.error("❌ MESSAGE:", error?.message);
+  console.error("❌ STACK:", error?.stack);
+   }
+  
   // 1️⃣ Abort transaction safely
   await session.abortTransaction();
   session.endSession();
@@ -306,38 +356,42 @@ export const completeToBankTransfer = async (req, res) => {
 
     const balanceAfter = wallet.balance;
 
-    await Ledger.create(
-      {
-        userId: tx.userId,
-        walletId: wallet._id,
-        internalNuban: wallet.internalNuban,
-        accountNumber: wallet.accountNumber,
-        type: "DEBIT",
-        source: "TO_BANK",
-        amount: tx.amount,
-        balanceBefore,
-        balanceAfter: balanceBefore - tx.amount,
-        narration: tx.narration,
-        reference,
-      },
-      { session }
-    );
+   await Ledger.create(
+  [
+    {
+      userId: tx.userId,
+      walletId: wallet._id,
+      internalNuban: wallet.internalNuban,
+      accountNumber: wallet.accountNumber,
+      type: "DEBIT",
+      source: "TO_BANK",
+      amount: tx.amount,
+      balanceBefore,
+      balanceAfter,
+      narration: tx.narration,
+      reference,
+    }
+  ],
+  { session }
+);
 
     
     if (fee > 0) {
       await Ledger.create(
-        {
+      [
+         {
           userId: tx.userId,
           walletId: wallet._id,
           internalNuban: wallet.internalNuban,
           type: "DEBIT",
           source: "TO_BANK_FEE",
           amount: fee,
-          balanceBefore: balanceBefore - tx.amount,
-          balanceAfter: balanceBefore - totalDebit,
+          balanceBefore: balanceAfter,
+          balanceAfter: balanceAfter - fee,
           narration: "Transfer service fee",
           reference,
         },
+      ],
         { session }
       );
 
@@ -355,7 +409,7 @@ export const completeToBankTransfer = async (req, res) => {
         session
       );
     }
-       await PlatformLedger.create(
+   await PlatformLedger.create(
   [
     {
       reference,
@@ -365,7 +419,7 @@ export const completeToBankTransfer = async (req, res) => {
       amount: fee,
       narration: "To Bank transfer service fee",
       meta: {
-        userId,
+        userId: tx.userId,
       },
     },
   ],

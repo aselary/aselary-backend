@@ -6,7 +6,7 @@ export const previewToBankTransfer = async (req, res) => {
   try {
     const { amount } = req.body;
 
-    if (!amount || amount <= 90) {
+    if (!amount || amount <= 99) {
       return res.status(400).json({
         message: "Invalid amount"
       });

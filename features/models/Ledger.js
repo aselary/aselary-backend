@@ -16,12 +16,14 @@ const ledgerSchema = new mongoose.Schema(
 
     internalNuban: {
       type: String,
-      required: true, // PRIVATE
+      required: false, // PRIVATE
+      default: null,
     },
 
     accountNumber: {
       type: String,
-      required: true, // what user knows
+      required: false, // what user knows
+      default: null,
     },
     
     type: {

@@ -38,8 +38,6 @@ import walletRoutes from "./features/wallet/walletRoutes.js";
 import { securityGuard } from "./features/middleware/securityGuard.js";
 import paystackRoutes from "./features/paystack/paystack.route.js";
 import ussdRoutes from "./features/ussd/ussd.route.js";
-import { ussdWebhook } from "./features/ussd/ussd.controller.js";
-import { transferWebhook } from "./features/transfer/transferWebhook.controller.js";
 import a2aTransferRoutes from "./features/A2A/a2aTransfer.route.js";
 import withdrawalRoutes from "./features/withdraw/withdrawal.routes.js";
 import bankRoutes from "./features/bank/bank.routes.js";
@@ -127,10 +125,6 @@ app.use(
 // ⚠️ Paystack webhook MUST come BEFORE express.json()
 app.use("/paystack/webhook", express.raw({ type: "application/json" }), paystackWebhookRoute);
 
-
-
-app.post("/webhook", express.raw({ type: "application/json" }), ussdWebhook);
-app.post("/transfer/webhook", express.raw({ type: "*/*" }), transferWebhook);
 
 app.use(express.json());
 app.use(morgan("dev"));
