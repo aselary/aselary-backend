@@ -32,35 +32,31 @@ router.post(
       /* -------------------------------------------------
        * 2. PARSE EVENT
        * ------------------------------------------------- */
-      const event = JSON.parse(req.body.toString());
+   // 1. Parse event
+const event = JSON.parse(req.body.toString());
+if (event.event !== "charge.success") return res.sendStatus(200);
 
-      if (event.event !== "charge.success") {
-        return res.sendStatus(200);
-      }
-        if (isDev) {
-      console.log("EVENT:", event.event);
-        }
+const data = event.data;
 
-      const data = event.data;
-      let accountNumber = null;
-      if (isDev) {
-      console.log("RAW DATA:", JSON.stringify(data, null, 2));
-      }
+// 2. Resolve user
+let user = null;
 
-      /* -------------------------------------------------
-       * 4. FIND USER BY PAYSTACK DVA
-       * ------------------------------------------------- */
-     const userId = data.metadata?.userId;
-
-if (!userId) {
-  console.log("❌ Missing userId in metadata");
-  return res.sendStatus(200);
+// CARD → metadata
+if (data.metadata?.userId) {
+  user = await User.findById(data.metadata.userId);
 }
 
-const user = await User.findById(userId);
+// BANK TRANSFER → account number
+if (!user && data.channel === "bank_transfer") {
+  const accountNumber = data.receiver_bank_account_number;
+
+  user = await User.findOne({
+    "paystackDVA.accountNumber": accountNumber
+  });
+}
 
 if (!user) {
-  console.log("❌ User not found:", userId);
+  console.log("❌ User not resolved for Paystack event");
   return res.sendStatus(200);
 }
 
