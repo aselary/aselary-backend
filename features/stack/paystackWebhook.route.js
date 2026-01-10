@@ -59,8 +59,9 @@ if (data.metadata?.userId) {
 }
 
 // 2️⃣ BANK TRANSFER → receiver virtual account
-if (!user && data.channel === "bank_transfer") {
-  const accountNumber =
+if (!user && (data.channel === "bank_transfer" || data.channel === "dedicated_nuban") ) {
+   const accountNumber =
+    data.dedicated_account?.account_number ||
     data.authorization?.receiver_bank_account_number ||
     data.receiver_bank_account_number;
 
