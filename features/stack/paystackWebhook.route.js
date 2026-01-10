@@ -135,7 +135,7 @@ if (!user) {
       
 let counterpartyName = "Paystack"; // default fallback
 
-if (data.channel === "bank_transfer") {
+if (data.channel === "dedicated_nuban") {
   const senderName = data.sender_name || "Unknown Sender";
   const senderBank = data.sender_bank || "External Bank";
   counterpartyName = `${senderBank} (${senderName})`;
