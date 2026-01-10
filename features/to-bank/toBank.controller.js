@@ -175,6 +175,10 @@ console.log("🔥 RECIPIENT PAYLOAD", {
   accountNumber,
   bankCode,
 });
+
+if (bankCode === "999992") {
+  throw new Error("This bank does not support payouts");
+}
 const recipientCode = await createTransferRecipient({
   name: accountName,
   accountNumber,
