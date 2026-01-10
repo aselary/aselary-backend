@@ -32,31 +32,57 @@ router.post(
       /* -------------------------------------------------
        * 2. PARSE EVENT
        * ------------------------------------------------- */
-   // 1. Parse event
-const event = JSON.parse(req.body.toString());
-if (event.event !== "charge.success") return res.sendStatus(200);
+      const event = JSON.parse(req.body.toString());
 
-const data = event.data;
+      if (event.event !== "charge.success") {
+        return res.sendStatus(200);
+      }
+        if (isDev) {
+      console.log("EVENT:", event.event);
+        }
 
-// 2. Resolve user
+      const data = event.data;
+      let accountNumber = null;
+      if (isDev) {
+      console.log("RAW DATA:", JSON.stringify(data, null, 2));
+      }
+
+    /* -------------------------------------------------
+ * 4. RESOLVE USER (CARD OR BANK TRANSFER)
+ * ------------------------------------------------- */
+
 let user = null;
 
-// CARD → metadata
+// 1️⃣ CARD / USSD → metadata.userId
 if (data.metadata?.userId) {
   user = await User.findById(data.metadata.userId);
 }
 
-// BANK TRANSFER → account number
+// 2️⃣ BANK TRANSFER → receiver virtual account
 if (!user && data.channel === "bank_transfer") {
-  const accountNumber = data.receiver_bank_account_number;
+  const accountNumber =
+    data.authorization?.receiver_bank_account_number ||
+    data.receiver_bank_account_number;
 
-  user = await User.findOne({
-    "paystackDVA.accountNumber": accountNumber
+  console.log("🔍 Bank transfer resolution", {
+    channel: data.channel,
+    accountNumber,
+    reference: data.reference,
   });
+
+  if (accountNumber) {
+    user = await User.findOne({
+      "paystackDVA.accountNumber": accountNumber,
+    });
+  }
 }
 
+// 3️⃣ FINAL GUARD
 if (!user) {
-  console.log("❌ User not resolved for Paystack event");
+  console.log("❌ User not resolved for Paystack event", {
+    channel: data.channel,
+    reference: data.reference,
+  });
   return res.sendStatus(200);
 }
 
