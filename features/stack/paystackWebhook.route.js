@@ -65,11 +65,13 @@ if (!user && (data.channel === "bank_transfer" || data.channel === "dedicated_nu
     data.authorization?.receiver_bank_account_number ||
     data.receiver_bank_account_number;
 
+    if (isDev) {
   console.log("🔍 Bank transfer resolution", {
     channel: data.channel,
     accountNumber,
     reference: data.reference,
   });
+}
 
   if (accountNumber) {
     user = await User.findOne({
@@ -80,10 +82,12 @@ if (!user && (data.channel === "bank_transfer" || data.channel === "dedicated_nu
 
 // 3️⃣ FINAL GUARD
 if (!user) {
+  if (isDev) {
   console.log("❌ User not resolved for Paystack event", {
     channel: data.channel,
     reference: data.reference,
   });
+}
   return res.sendStatus(200);
 }
 
@@ -110,7 +114,9 @@ if (!user) {
       });
 
       if (existing) {
+        if (isDev) {
         console.log("⚠️ Duplicate transaction ignored");
+        }
         return res.sendStatus(200);
       }
 
@@ -125,11 +131,12 @@ if (!user) {
       const balanceAfter = wallet.balance;
 
      
-         
+         if (isDev) {
       console.log("ACCOUNT NUMBER:", accountNumber);
       console.log("USER FOUND:", true);
       console.log("WALLET FOUND:", true);
       console.log("AMOUNT:", amount);
+         }
          
  const internalNuban = wallet.internalNuban || null;
       
