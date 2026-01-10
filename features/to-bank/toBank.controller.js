@@ -169,8 +169,14 @@ if (isDev) {
   { session }
 );
 
-const recipientCode = await createTransferRecipient({
+
+console.log("🔥 RECIPIENT PAYLOAD", {
   accountName,
+  accountNumber,
+  bankCode,
+});
+const recipientCode = await createTransferRecipient({
+  name: accountName,
   accountNumber,
   bankCode,
 });
@@ -287,11 +293,11 @@ await Transaction.create(
     });
    } catch (error) {
 
-   if (isDev) {
+
      console.error("🔥 TO BANK CRASHED");
   console.error("❌ MESSAGE:", error?.message);
   console.error("❌ STACK:", error?.stack);
-   }
+   
   
   // 1️⃣ Abort transaction safely
   await session.abortTransaction();
