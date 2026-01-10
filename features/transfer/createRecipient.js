@@ -22,9 +22,9 @@ export const createTransferRecipient = async ({
     }
   });
 
-  if (!response.data.status) {
+  if (!response.status) {
     throw new Error("Failed to create transfer recipient");
   }
 
-  return response.data.data.recipient_code;
+  return response.data.recipient_code;
 };
