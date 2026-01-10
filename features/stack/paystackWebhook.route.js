@@ -2,6 +2,7 @@ import express from "express";
 import crypto from "crypto";
 import User from "../models/User.js";
 import Wallet from "../models/Wallet.js";
+import ToBankTransaction from "../models/ToBankTransaction.js";
 import Ledger from "../models/Ledger.js";
 import ActivityLog from "../models/ActivityLog.js";
 import isDev from "../utils/isDev.js";
@@ -96,14 +97,10 @@ if (!user) {
        * ------------------------------------------------- */
       let wallet = await Wallet.findOne({ userId: user._id });
 
-      if (!wallet) {
-        wallet = await Wallet.create({
-          userId: user._id,
-          balance: 0,
-          internalNuban: accountNumber,
-          accountNumber,
-        });
-      }
+if (!wallet) {
+  console.log("⚠️ Wallet not found for user", user._id);
+  return res.sendStatus(200);
+}
 
       /* -------------------------------------------------
        * 6. PREVENT DUPLICATE CREDIT
@@ -154,7 +151,7 @@ if (!senderName && senderBank) {
 if (!senderName && !senderBank) {
   senderName = "Bank Transfer";
 }
-  counterpartyName = `${senderBank} (${senderName})`;
+  counterpartyName = `${senderName}`;
 }
 else if (data.channel === "card") {
   counterpartyName = `${data.authorization?.bank || data.authorization?.brand || "Card Payment"}`;
@@ -217,10 +214,55 @@ else if (data.channel === "ussd") {
        paidAt: data.paid_at,
     },
 });
-      /* -------------------------------------------------
-       * 9. ACKNOWLEDGE PAYSTACK
-       * ------------------------------------------------- */
-      return res.sendStatus(200);
+
+
+const allowedEvents = [
+  "charge.success",
+  "transfer.success",
+  "transfer.failed",
+];
+
+if (!allowedEvents.includes(event.event)) {
+  return res.sendStatus(200);
+}
+if (event.event === "transfer.success") {
+  const { reference } = event.data;
+
+  await ToBankTransaction.findOneAndUpdate(
+    { reference },
+    { status: "SUCCESS", completedAt: new Date() }
+  );
+}
+
+if (event.event === "transfer.failed") {
+  const { reference } = event.data;
+
+  await ToBankTransaction.findOneAndUpdate(
+    { reference },
+    {
+      status: "FAILED",
+      completedAt: new Date(),
+    }
+  );
+
+  await ActivityLog.findOneAndUpdate(
+    { reference },
+    {
+      status: "FAILED",
+      completedAt: new Date(),
+    }
+  );
+
+  await Transaction.findOneAndUpdate(
+    { reference, type: "TO_BANK" },
+    {
+      status: "FAILED",
+      completedAt: new Date(),
+    }
+  );
+
+  return res.sendStatus(200);
+}
     } catch (err) {
       if (isDev) {
       console.error("❌ LEDGER FAILURE:", err.message);

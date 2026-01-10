@@ -10,6 +10,8 @@ import { calculateFee } from "../utils/calculateFee.js";
 import { TO_BANK_FEES } from "../../config/fee.js";
 import { LIMITS } from "../../config/limits.js";
 import { getDailyTransferTotal } from "../utils/getDailyTransferTotal.js";
+import { createTransferRecipient } from "../transfer/createRecipient.js";
+import { initiatePaystackTransfer } from "../transfer/initiateTransfer.js";
 import isDev from "../utils/isDev.js";
 
 export const toBankTransfer = async (req, res) => {
@@ -166,6 +168,25 @@ if (isDev) {
   }],
   { session }
 );
+
+const recipientCode = await createTransferRecipient({
+  accountName,
+  accountNumber,
+  bankCode,
+});
+
+if (!recipientCode) {
+  throw new Error("Failed to create Paystack recipient");
+}
+
+await initiatePaystackTransfer({
+  amount,
+  recipientCode,
+  reference,
+  narration,
+});
+
+
   if (isDev) {
 console.log("📒 STEP 6: Creating ActivityLog...");
   }
