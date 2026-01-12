@@ -8,6 +8,13 @@ const platformLedgerSchema = new mongoose.Schema(
       index: true,
     },
 
+     environment: {
+      type: String,
+      enum: ['test', 'production'],
+      required: true,
+      index: true
+    },
+
     source: {
       type: String,
       enum: ["A2A", "TO_BANK", "DEPOSIT", "ADJUSTMENT"],

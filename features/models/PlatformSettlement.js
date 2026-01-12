@@ -16,6 +16,13 @@ const PlatformSettlementSchema = new mongoose.Schema(
       min: 0,
     },
 
+     environment: {
+      type: String,
+      enum: ['test', 'production'],
+      required: true,
+      index: true
+    },
+
     // Snapshot of platform ledger total at settlement time
     ledgerTotalAtTime: {
       type: Number,

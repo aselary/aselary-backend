@@ -2,7 +2,6 @@ import express from "express";
 import crypto from "crypto";
 import User from "../models/User.js";
 import Wallet from "../models/Wallet.js";
-import ToBankTransaction from "../models/ToBankTransaction.js";
 import Ledger from "../models/Ledger.js";
 import ActivityLog from "../models/ActivityLog.js";
 import isDev from "../utils/isDev.js";
@@ -34,15 +33,76 @@ router.post(
        * 2. PARSE EVENT
        * ------------------------------------------------- */
       const event = JSON.parse(req.body.toString());
+        const DEPOSIT_EVENTS = [
+             "charge.success",          // card, ussd, some bank transfers
+              "transfer.success",        // dedicated NUBAN deposit
+            ];
 
-      if (event.event !== "charge.success") {
-        return res.sendStatus(200);
-      }
+        const WITHDRAWAL_EVENTS = [
+               "transfer.success",        // withdrawal success
+               "transfer.failed",         // withdrawal failed
+             ];
+
         if (isDev) {
       console.log("EVENT:", event.event);
         }
 
       const data = event.data;
+      // -------------------------------
+// WITHDRAWAL EVENTS
+// -------------------------------
+if (
+  WITHDRAWAL_EVENTS.includes(event.event) &&
+  data?.reference &&
+  data?.reason === "withdrawal"
+) {
+  const ledger = await Ledger.findOne({
+    _id: data.reference,
+    source: "withdrawal",
+    status: "PENDING",
+  });
+
+  if (!ledger) {
+    return res.sendStatus(200);
+  }
+
+  if (event.event === "transfer.success") {
+    ledger.status = "SUCCESS";
+    ledger.completedAt = new Date();
+    await ledger.save();
+
+    await ActivityLog.findOneAndUpdate(
+      { reference: data.reference },
+      { status: "SUCCESS" }
+    );
+
+    return res.sendStatus(200);
+  }
+
+  if (event.event === "transfer.failed") {
+    const wallet = await Wallet.findById(ledger.walletId);
+    if (!wallet) return res.sendStatus(200);
+
+    wallet.balance += ledger.amount;
+    await wallet.save();
+
+    ledger.status = "FAILED";
+    ledger.refunded = true;
+    ledger.refundedAt = new Date();
+    await ledger.save();
+
+    await ActivityLog.findOneAndUpdate(
+      { reference: data.reference },
+      {
+        status: "FAILED",
+        note: "Withdrawal failed, wallet refunded",
+      }
+    );
+
+    return res.sendStatus(200);
+  }
+}
+
       let accountNumber = null;
       if (isDev) {
       console.log("RAW DATA:", JSON.stringify(data, null, 2));
@@ -215,54 +275,6 @@ else if (data.channel === "ussd") {
     },
 });
 
-
-const allowedEvents = [
-  "charge.success",
-  "transfer.success",
-  "transfer.failed",
-];
-
-if (!allowedEvents.includes(event.event)) {
-  return res.sendStatus(200);
-}
-if (event.event === "transfer.success") {
-  const { reference } = event.data;
-
-  await ToBankTransaction.findOneAndUpdate(
-    { reference },
-    { status: "SUCCESS", completedAt: new Date() }
-  );
-}
-
-if (event.event === "transfer.failed") {
-  const { reference } = event.data;
-
-  await ToBankTransaction.findOneAndUpdate(
-    { reference },
-    {
-      status: "FAILED",
-      completedAt: new Date(),
-    }
-  );
-
-  await ActivityLog.findOneAndUpdate(
-    { reference },
-    {
-      status: "FAILED",
-      completedAt: new Date(),
-    }
-  );
-
-  await Transaction.findOneAndUpdate(
-    { reference, type: "TO_BANK" },
-    {
-      status: "FAILED",
-      completedAt: new Date(),
-    }
-  );
-
-  return res.sendStatus(200);
-}
     } catch (err) {
       if (isDev) {
       console.error("❌ LEDGER FAILURE:", err.message);

@@ -17,6 +17,13 @@ const TreasuryRecipientSchema = new mongoose.Schema(
       required: true,
     },
 
+     environment: {
+      type: String,
+      enum: ['test', 'production'],
+      required: true,
+      index: true
+    },
+
     currency: {
       type: String,
       default: "NGN",

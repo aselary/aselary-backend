@@ -18,10 +18,17 @@ const settlementRecordSchema = new mongoose.Schema(
       required: true,
     },
 
-   difference: {
-  type: Number,
-  required: true,
-},
+    difference: {
+      type: Number,
+      required: true,
+    },
+
+    environment: {
+      type: String,
+      enum: ['test', 'production'],
+      required: true,
+      index: true
+    },
 
 status: {
   type: String,

@@ -12,6 +12,13 @@ const ReconciliationAuditSchema = new mongoose.Schema(
       default: "MISMATCH",
     },
 
+     environment: {
+      type: String,
+      enum: ['test', 'production'],
+      required: true,
+      index: true
+    },
+
     reason: { type: String }, // admin explanation
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
 

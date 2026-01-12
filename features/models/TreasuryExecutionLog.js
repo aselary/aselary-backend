@@ -16,6 +16,13 @@ const TreasuryExecutionLogSchema = new mongoose.Schema(
       index: true,
     },
 
+     environment: {
+      type: String,
+      enum: ['test', 'production'],
+      required: true,
+      index: true
+    },
+
     amount: {
       type: Number,
       required: true,

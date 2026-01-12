@@ -7,6 +7,13 @@ const platformBalanceSchema = new mongoose.Schema(
       default: "NGN",
     },
 
+     environment: {
+      type: String,
+      enum: ['test', 'production'],
+      required: true,
+      index: true
+    },
+
     balance: {
       type: Number,
       default: 0, // total platform money (fees)

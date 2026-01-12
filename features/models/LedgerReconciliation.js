@@ -14,6 +14,14 @@ const LedgerReconciliationSchema = new mongoose.Schema(
       required: true,
     },
 
+
+    environment: {
+      type: String,
+      enum: ['test', 'production'],
+      required: true,
+      index: true
+    },
+
     ledgerTotal: {
       type: Number,
       required: true,

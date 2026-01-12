@@ -176,9 +176,7 @@ console.log("🔥 RECIPIENT PAYLOAD", {
   bankCode,
 });
 
-if (bankCode === "999992") {
-  throw new Error("This bank does not support payouts");
-}
+
 const recipientCode = await createTransferRecipient({
   name: accountName,
   accountNumber,
@@ -418,7 +416,7 @@ export const completeToBankTransfer = async (req, res) => {
           source: "TO_BANK_FEE",
           amount: fee,
           balanceBefore: balanceAfter,
-          balanceAfter: balanceAfter - fee,
+          balanceAfter: balanceAfter,
           narration: "Transfer service fee",
           reference,
         },
@@ -462,7 +460,7 @@ export const completeToBankTransfer = async (req, res) => {
     tx.completedAt = new Date();
     await tx.save({ session });
 
-    
+
     await ActivityLog.findOneAndUpdate(
       { reference },
       { status: "SUCCESS", completedAt: new Date() },
