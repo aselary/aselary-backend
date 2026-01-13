@@ -371,20 +371,19 @@ export const completeToBankTransfer = async (req, res) => {
   try {
     
     const tx = await ToBankTransaction.findOne({ reference }).session(session);
-
     if (!tx) {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({ message: "Transaction not found" });
     }
 
-    if (tx.status !== "PENDING") {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ message: "Transaction already resolved" });
-    }
+    if (!["PENDING", "PROCESSING"].includes(tx.status)) {
+  await session.abortTransaction();
+  session.endSession();
+  return res.status(400).json({ message: "Transaction already resolved" });
+}
 
-    
+
     const wallet = await Wallet.findById(tx.walletId)
       .select("balance internalNuban accountNumber")
       .session(session);
