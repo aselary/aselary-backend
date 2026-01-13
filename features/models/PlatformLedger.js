@@ -11,7 +11,7 @@ const platformLedgerSchema = new mongoose.Schema(
      environment: {
       type: String,
       enum: ['test', 'production'],
-      required: true,
+      default: "production",
       index: true
     },
 
