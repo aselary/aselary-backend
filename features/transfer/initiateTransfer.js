@@ -23,8 +23,8 @@ if (!response.data.status) {
 }
 
 return {
-  status: response.data.data.status,           // otp | pending | success
-  transferCode: response.data.data.transfer_code,
-  requiresOtp: response.data.data.status === "otp",
+  status: response.data.status,           // otp | pending | success
+  transferCode: response.data.transfer_code,
+  requiresOtp: response.data.status === "otp",
 };
 };
