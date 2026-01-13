@@ -191,7 +191,7 @@ if (!recipientCode) {
   amount,
   recipientCode,
   reference,
-  narration,
+  reason: narration,
 });
 
 
@@ -199,7 +199,7 @@ if (init.requiresOtp) {
   await ToBankTransaction.findOneAndUpdate(
     { reference },
     {
-      status: "AWAITING_OTP",
+      status: "PROCESSING",
       transferCode: init.transferCode,
     },
     { session }
@@ -207,7 +207,7 @@ if (init.requiresOtp) {
 
   await ActivityLog.findOneAndUpdate(
     { reference },
-    { status: "AWAITING_OTP" },
+    { status: "PROCESSING" },
     { session }
   );
 
