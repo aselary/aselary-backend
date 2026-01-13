@@ -85,7 +85,7 @@ const activityLogSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["PENDING", "SUCCESS", "FAILED", "REVERSED"],
+      enum: ["PENDING", "SUCCESS", "FAILED", "REVERSED", "AWAITING_OTP"],
       default: "PENDING",
       index: true,
     },

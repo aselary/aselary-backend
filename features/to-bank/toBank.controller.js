@@ -187,12 +187,55 @@ if (!recipientCode) {
   throw new Error("Failed to create Paystack recipient");
 }
 
-await initiatePaystackTransfer({
+ const init = await initiatePaystackTransfer({
   amount,
   recipientCode,
   reference,
   narration,
 });
+
+
+if (init.requiresOtp) {
+  await ToBankTransaction.findOneAndUpdate(
+    { reference },
+    {
+      status: "AWAITING_OTP",
+      transferCode: init.transferCode,
+    },
+    { session }
+  );
+
+  await ActivityLog.findOneAndUpdate(
+    { reference },
+    { status: "AWAITING_OTP" },
+    { session }
+  );
+
+  await session.commitTransaction();
+  session.endSession();
+
+  return res.status(200).json({
+    success: true,
+    message: "OTP required to complete transfer",
+    data: {
+      reference,
+      requiresOtp: true,
+    },
+  });
+}
+
+// ✅ OTP = PROCESSING (NOT FAILED)
+await ToBankTransaction.findOneAndUpdate(
+  { reference },
+  { status: "PROCESSING" },
+  { session }
+);
+
+await ActivityLog.findOneAndUpdate(
+  { reference },
+  { status: "PENDING" },
+  { session }
+);
 
 
   if (isDev) {
@@ -283,7 +326,7 @@ await Transaction.create(
 
     return res.status(200).json({
       success: true,
-      message: "Transfer to bank initiated",
+      message: "Transfer initiated",
       data: {
         reference,
         narration,
@@ -309,26 +352,6 @@ await Transaction.create(
   console.error("TO BANK ERROR:", error);
   }
 
-  // 2️⃣ AUTO-FAIL pending transfer (if reference was generated)
-  if (reference) {
-    await ToBankTransaction.findOneAndUpdate(
-      { reference, status: "PENDING" },
-      {
-        status: "FAILED",
-        failureReason: error.message || "Initialization error",
-        completedAt: new Date(),
-      }
-    );
-
-    await ActivityLog.findOneAndUpdate(
-      { reference },
-      {
-        status: "FAILED",
-        reason: error.message || "Initialization error",
-        completedAt: new Date(),
-      }
-    );
-  }
 
   // 3️⃣ Respond to client
   return res.status(500).json({

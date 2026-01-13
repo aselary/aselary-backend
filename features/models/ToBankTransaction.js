@@ -46,7 +46,7 @@ const toBankTransactionSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["PENDING", "PROCESSING", "SUCCESS", "FAILED", "REVERSED"],
+      enum: ["PENDING", "PROCESSING", "SUCCESS", "FAILED", "REVERSED", "AWAITING_OTP"],
       default: "PENDING",
       index: true,
     },
