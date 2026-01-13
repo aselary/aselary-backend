@@ -368,15 +368,25 @@ export const completeToBankTransfer = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
+  console.log("[COMPLETE_TO_BANK] START", { reference });
   try {
     
     const tx = await ToBankTransaction.findOne({ reference }).session(session);
+    console.log("[COMPLETE_TO_BANK] TX FOUND", {
+  id: tx?._id,
+  status: tx?.status,
+  amount: tx?.amount,
+  fee: tx?.fee,
+  walletId: tx?.walletId,
+});
+
     if (!tx) {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({ message: "Transaction not found" });
     }
-
+  
+    console.log("[COMPLETE_TO_BANK] STATUS CHECK PASSED", tx.status);
     if (!["PENDING", "PROCESSING"].includes(tx.status)) {
   await session.abortTransaction();
   session.endSession();
@@ -392,6 +402,12 @@ export const completeToBankTransfer = async (req, res) => {
       throw new Error("Wallet not found");
     }
 
+    console.log("[COMPLETE_TO_BANK] WALLET FOUND", {
+  walletId: wallet?._id,
+  balance: wallet?.balance,
+  internalNuban: wallet?.internalNuban,
+});
+
     
     const balanceBefore = wallet.balance;
     const fee = tx.fee || 0;
@@ -403,7 +419,16 @@ export const completeToBankTransfer = async (req, res) => {
 
     
     wallet.balance -= totalDebit;
+    console.log("[COMPLETE_TO_BANK] DEBIT CALC", {
+  balanceBefore,
+  amount: tx.amount,
+  fee,
+  totalDebit,
+});
     await wallet.save({ session });
+    console.log("[COMPLETE_TO_BANK] WALLET DEBITED", {
+  balanceAfter: wallet.balance,
+});
 
     const balanceAfter = wallet.balance;
 
@@ -428,6 +453,7 @@ export const completeToBankTransfer = async (req, res) => {
 
     
     if (fee > 0) {
+    console.log("[COMPLETE_TO_BANK] FEE PROCESSED", { fee });
       await Ledger.create(
       [
          {
@@ -479,6 +505,7 @@ export const completeToBankTransfer = async (req, res) => {
  
     
     tx.status = "SUCCESS";
+    console.log("[COMPLETE_TO_BANK] SETTING TX SUCCESS");
     tx.completedAt = new Date();
     await tx.save({ session });
 
@@ -497,6 +524,7 @@ export const completeToBankTransfer = async (req, res) => {
     );
 
     await session.commitTransaction();
+    console.log("[COMPLETE_TO_BANK] COMMITTING TRANSACTION");
     session.endSession();
 
     return res.json({
@@ -507,9 +535,9 @@ export const completeToBankTransfer = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-     if (isDev) {
+     
     console.error("COMPLETE TO BANK ERROR:", error);
-     }
+     
 
     return res.status(500).json({
       message: error.message || "Internal server error",
