@@ -362,12 +362,13 @@ await Transaction.create(
 
 
 
+
 export const completeToBankTransfer = async (req, res) => {
   const { reference } = req.body;
 
   const session = await mongoose.startSession();
   session.startTransaction();
-
+    
   console.log("[COMPLETE_TO_BANK] START", { reference });
   try {
     
@@ -379,6 +380,14 @@ export const completeToBankTransfer = async (req, res) => {
   fee: tx?.fee,
   walletId: tx?.walletId,
 });
+
+     if (tx.status !== "OTP_VERIFIED") {
+  await session.abortTransaction();
+  session.endSession();
+  return res.status(400).json({
+    message: "OTP not verified",
+  });
+}
 
     if (!tx) {
       await session.abortTransaction();
@@ -545,6 +554,10 @@ export const completeToBankTransfer = async (req, res) => {
   }
 };
 
+
+
+
+
 export const failToBankTransfer = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -606,5 +619,75 @@ export const failToBankTransfer = async (req, res) => {
     });
   } finally {
     session.endSession();
+  }
+};
+
+
+
+
+export const verifyToBankOtp = async (req, res) => {
+  const { reference, otp } = req.body;
+
+  if (!reference || !otp) {
+    return res.status(400).json({
+      message: "Reference and OTP are required",
+    });
+  }
+
+  try {
+    // 1️⃣ Find transaction
+    const tx = await ToBankTransaction.findOne({ reference });
+
+    if (!tx) {
+      return res.status(404).json({
+        message: "Transaction not found",
+      });
+    }
+
+    // 2️⃣ Guard: must be waiting for OTP
+    if (!["PROCESSING", "OTP_REQUIRED"].includes(tx.status)) {
+      return res.status(400).json({
+        message: "Transaction not awaiting OTP",
+      });
+    }
+
+    if (!tx.transferCode) {
+      return res.status(400).json({
+        message: "Missing transfer code",
+      });
+    }
+
+    // 3️⃣ Call Paystack to finalize transfer
+    const response = await paystack.post(
+      "/transfer/finalize_transfer",
+      {
+        transfer_code: tx.transferCode,
+        otp,
+      }
+    );
+
+    if (response.data.status !== true) {
+      return res.status(400).json({
+        message: "OTP verification failed",
+      });
+    }
+
+    // 4️⃣ Mark OTP verified
+    tx.status = "OTP_VERIFIED";
+    tx.otpVerifiedAt = new Date();
+    await tx.save();
+
+    return res.json({
+      success: true,
+      message: "OTP verified successfully",
+      reference,
+    });
+
+  } catch (error) {
+    console.error("VERIFY TO BANK OTP ERROR:", error);
+
+    return res.status(500).json({
+      message: error.message || "Internal server error",
+    });
   }
 };
