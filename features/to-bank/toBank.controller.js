@@ -205,6 +205,12 @@ if (init.requiresOtp) {
     { session }
   );
 
+  const checkTxn = await ToBankTransaction.findOne({ reference });
+console.log("🧠 DB AFTER INIT:", {
+  status: checkTxn.status,
+  transferCode: checkTxn.transferCode,
+});
+
   await ActivityLog.findOneAndUpdate(
     { reference },
     { status: "PROCESSING" },
