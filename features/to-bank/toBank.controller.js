@@ -691,3 +691,38 @@ export const verifyToBankOtp = async (req, res) => {
     });
   }
 };
+
+
+export const toBankStatus = async (req, res) => {
+  try {
+    const { reference } = req.query;
+
+    if (!reference) {
+      return res.status(400).json({
+        success: false,
+        message: "Reference is required",
+      });
+    }
+
+    const txn = await ToBankTransaction.findOne({ reference });
+
+    if (!txn) {
+      return res.status(404).json({
+        success: false,
+        message: "Transaction not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      status: txn.status, // PENDING | PROCESSING | SUCCESS | FAILED
+      requiresOtp: txn.status === "PROCESSING",
+    });
+  } catch (err) {
+    console.error("TO BANK STATUS ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch transfer status",
+    });
+  }
+};
