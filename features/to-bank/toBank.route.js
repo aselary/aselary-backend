@@ -17,6 +17,6 @@ router.post("/to-bank/complete", protect, securityGuard, completeToBankTransfer)
 router.post("/to-bank/fail", protect, securityGuard, failToBankTransfer);
 router.post("/preview", protect, previewToBankTransfer);
 router.post("/to-bank/verify-otp", verifyToBankOtp);
-router.post("/to-bank/status", toBankStatus);
+router.get("/to-bank/status", toBankStatus);
 
 export default router;
