@@ -194,22 +194,17 @@ if (!recipientCode) {
   reason: narration,
 });
 
-
 if (init.requiresOtp) {
+  // 1️⃣ Update ONLY what is needed for OTP
   await ToBankTransaction.findOneAndUpdate(
     { reference },
     {
       status: "PROCESSING",
       transferCode: init.transferCode,
+      requiresOtp: true,
     },
     { session }
   );
-
-  const checkTxn = await ToBankTransaction.findOne({ reference });
-console.log("🧠 DB AFTER INIT:", {
-  status: checkTxn.status,
-  transferCode: checkTxn.transferCode,
-});
 
   await ActivityLog.findOneAndUpdate(
     { reference },
@@ -220,6 +215,7 @@ console.log("🧠 DB AFTER INIT:", {
   await session.commitTransaction();
   session.endSession();
 
+  // ⛔ ABSOLUTE STOP
   return res.status(200).json({
     success: true,
     message: "OTP required to complete transfer",
@@ -229,21 +225,6 @@ console.log("🧠 DB AFTER INIT:", {
     },
   });
 }
-
-// ✅ OTP = PROCESSING (NOT FAILED)
-await ToBankTransaction.findOneAndUpdate(
-  { reference },
-  { status: "PROCESSING" },
-  { session }
-);
-
-await ActivityLog.findOneAndUpdate(
-  { reference },
-  { status: "PENDING" },
-  { session }
-);
-
-
   if (isDev) {
 console.log("📒 STEP 6: Creating ActivityLog...");
   }
@@ -651,7 +632,7 @@ export const verifyToBankOtp = async (req, res) => {
     }
 
     // 2️⃣ Guard: must be waiting for OTP
-    if (!["PROCESSING", "OTP_REQUIRED"].includes(tx.status)) {
+    if (tx.status !== "PROCESSING") {
       return res.status(400).json({
         message: "Transaction not awaiting OTP",
       });
@@ -672,14 +653,14 @@ export const verifyToBankOtp = async (req, res) => {
       }
     );
 
-    if (response.data.status !== true) {
+    if (response?.data?.status) {
       return res.status(400).json({
         message: "OTP verification failed",
       });
     }
 
     // 4️⃣ Mark OTP verified
-    tx.status = "OTP_VERIFIED";
+    tx.status = "PROCESSING";
     tx.otpVerifiedAt = new Date();
     await tx.save();
 
