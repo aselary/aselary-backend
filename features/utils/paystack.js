@@ -1,11 +1,20 @@
-import axios from "axios";
+const PAYSTACK_BASE_URL = process.env.PAYSTACK_BASE_URL || "https://api.paystack.co";
 
-const paystack = axios.create({
-  baseURL: process.env.PAYSTACK_BASE_URL,
-  headers: {
-    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-    "Content-Type": "application/json",
-  },
-});
+export async function paystackRequest(path, method = "POST", body) {
+  const res = await fetch(`${PAYSTACK_BASE_URL}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
 
-export default paystack;
+  const json = await res.json();
+
+  if (!res.ok) {
+    throw new Error(json?.message || "Paystack request failed");
+  }
+
+  return json;
+}

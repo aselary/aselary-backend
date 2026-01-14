@@ -13,6 +13,7 @@ import { getDailyTransferTotal } from "../utils/getDailyTransferTotal.js";
 import { createTransferRecipient } from "../transfer/createRecipient.js";
 import { initiatePaystackTransfer } from "../transfer/initiateTransfer.js";
 import isDev from "../utils/isDev.js";
+import { paystackRequest }from "../utils/paystack.js";
 
 export const toBankTransfer = async (req, res) => {
     const session = await mongoose.startSession();
@@ -645,8 +646,9 @@ export const verifyToBankOtp = async (req, res) => {
     }
 
     // 3️⃣ Call Paystack to finalize transfer
-    const response = await paystack.post(
+    const response = await paystackRequest(
       "/transfer/finalize_transfer",
+      "POST",
       {
         transfer_code: tx.transferCode,
         otp,
