@@ -1,6 +1,6 @@
 import Wallet from "../models/Wallet.js";
 import Withdrawal from "../models/Withdrawal.js";
-import paystack from "../utils/paystack.js";
+import { paystackRequest }from "../utils/paystack.js";
 import crypto from "crypto";
 
 export const cashOut = async (req, res) => {
@@ -41,7 +41,7 @@ export const cashOut = async (req, res) => {
     });
 
     // 6️⃣ Create Paystack transfer recipient (TEST)
-    const recipientRes = await paystack.post("/transferrecipient", {
+    const recipientRes = await paystackRequest("/transferrecipient", "POST" , {
       type: "nuban",
       name: "User Cash Out",
       account_number: accountNumber,
