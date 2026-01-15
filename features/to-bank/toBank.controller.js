@@ -369,6 +369,13 @@ export const completeToBankTransfer = async (req, res) => {
   walletId: tx?.walletId,
 });
 
+
+    if (!tx) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: "Transaction not found" });
+    }
+
      if (tx.status !== "OTP_VERIFIED") {
   await session.abortTransaction();
   session.endSession();
@@ -376,18 +383,14 @@ export const completeToBankTransfer = async (req, res) => {
     message: "OTP not verified",
   });
 }
-
-    if (!tx) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(404).json({ message: "Transaction not found" });
-    }
   
     console.log("[COMPLETE_TO_BANK] STATUS CHECK PASSED", tx.status);
-    if (!["PENDING", "PROCESSING"].includes(tx.status)) {
+   if (!["OTP_VERIFIED", "PROCESSING"].includes(tx.status)) {
   await session.abortTransaction();
   session.endSession();
-  return res.status(400).json({ message: "Transaction already resolved" });
+  return res.status(400).json({
+    message: "Transaction already resolved"
+  });
 }
 
 
