@@ -170,12 +170,13 @@ if (isDev) {
   { session }
 );
 
-
+if (isDev) {
 console.log("🔥 RECIPIENT PAYLOAD", {
   accountName,
   accountNumber,
   bankCode,
 });
+}
 
 
 const recipientCode = await createTransferRecipient({
@@ -328,10 +329,11 @@ if (init.requiresOtp) {
     });
    } catch (error) {
 
-
+   if (isDev) {
      console.error("🔥 TO BANK CRASHED");
   console.error("❌ MESSAGE:", error?.message);
   console.error("❌ STACK:", error?.stack);
+   }
    
   
   // 1️⃣ Abort transaction safely
@@ -358,11 +360,13 @@ export const completeToBankTransfer = async (req, res) => {
 
   const session = await mongoose.startSession();
   session.startTransaction();
-    
+    if (isDev) {
   console.log("[COMPLETE_TO_BANK] START", { reference });
+    }
   try {
     
     const tx = await ToBankTransaction.findOne({ reference }).session(session);
+    if (isDev) {
     console.log("[COMPLETE_TO_BANK] TX FOUND", {
   id: tx?._id,
   status: tx?.status,
@@ -370,6 +374,7 @@ export const completeToBankTransfer = async (req, res) => {
   fee: tx?.fee,
   walletId: tx?.walletId,
 });
+}
 
 
     if (!tx) {
@@ -385,8 +390,9 @@ export const completeToBankTransfer = async (req, res) => {
     message: "OTP not verified",
   });
 }
-  
+     if (isDev) {
     console.log("[COMPLETE_TO_BANK] STATUS CHECK PASSED", tx.status);
+     }
    if (!["OTP_VERIFIED", "PROCESSING"].includes(tx.status)) {
   await session.abortTransaction();
   session.endSession();
@@ -403,12 +409,13 @@ export const completeToBankTransfer = async (req, res) => {
     if (!wallet) {
       throw new Error("Wallet not found");
     }
-
+   if (isDev) {
     console.log("[COMPLETE_TO_BANK] WALLET FOUND", {
   walletId: wallet?._id,
   balance: wallet?.balance,
   internalNuban: wallet?.internalNuban,
 });
+   }
 
     
     const balanceBefore = wallet.balance;
@@ -421,16 +428,20 @@ export const completeToBankTransfer = async (req, res) => {
 
     
     wallet.balance -= totalDebit;
+    if (isDev) {
     console.log("[COMPLETE_TO_BANK] DEBIT CALC", {
   balanceBefore,
   amount: tx.amount,
   fee,
   totalDebit,
 });
+    }
     await wallet.save({ session });
+    if (isDev) {
     console.log("[COMPLETE_TO_BANK] WALLET DEBITED", {
   balanceAfter: wallet.balance,
 });
+    }
 
     const balanceAfter = wallet.balance;
 
@@ -455,7 +466,9 @@ export const completeToBankTransfer = async (req, res) => {
 
     
     if (fee > 0) {
+      if (isDev) {
     console.log("[COMPLETE_TO_BANK] FEE PROCESSED", { fee });
+      }
       await Ledger.create(
       [
          {
@@ -507,7 +520,9 @@ export const completeToBankTransfer = async (req, res) => {
  
     
     tx.status = "SUCCESS";
+    if (isDev) {
     console.log("[COMPLETE_TO_BANK] SETTING TX SUCCESS");
+    }
     tx.completedAt = new Date();
     await tx.save({ session });
 
@@ -526,7 +541,9 @@ export const completeToBankTransfer = async (req, res) => {
     );
 
     await session.commitTransaction();
+    if (isDev) {
     console.log("[COMPLETE_TO_BANK] COMMITTING TRANSACTION");
+    }
     session.endSession();
 
     return res.json({
@@ -537,8 +554,9 @@ export const completeToBankTransfer = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-     
+     if (isDev) {
     console.error("COMPLETE TO BANK ERROR:", error);
+     }
      
 
     return res.status(500).json({

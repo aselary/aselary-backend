@@ -200,12 +200,18 @@ if (!wallet) {
 let counterpartyName = "Paystack"; // final fallback
 
 if (data.channel === "dedicated_nuban") {
-  const senderName =
-    data.authorization?.sender_name ||
-    data.authorization?.sender_bank ||
-    "Bank Transfer";
+  const senderName = data.authorization?.sender_name?.trim();
+  const senderBank = data.authorization?.sender_bank?.trim();
 
-  counterpartyName = senderName;
+  if (senderName && senderBank) {
+    counterpartyName = `${senderName} • ${senderBank}`;
+  } else if (senderName) {
+    counterpartyName = senderName;
+  } else if (senderBank) {
+    counterpartyName = senderBank;
+  } else {
+    counterpartyName = "Bank Transfer";
+  }
 }
 
 else if (data.channel === "card") {
@@ -215,13 +221,14 @@ else if (data.channel === "ussd") {
   counterpartyName = `${data.authorization?.bank || "USSD / Paystack"}`;
 }
 
-
+if (isDev) {
 console.log("WEBHOOK SENDER DEBUG:", {
   channel: data.channel,
   sender_name: data.authorization?.sender_name,
   sender_bank: data.authorization?.sender_bank,
   counterpartyName,
 });
+}
 
      await Ledger.create({
   userId: user._id,
