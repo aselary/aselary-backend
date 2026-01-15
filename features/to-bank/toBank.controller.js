@@ -705,7 +705,7 @@ export const toBankStatus = async (req, res) => {
     return res.status(200).json({
       success: true,
       status: txn.status, // PENDING | PROCESSING | SUCCESS | FAILED
-      requiresOtp: txn.status === "PROCESSING",
+      requiresOtp: txn.status === "OTP_REQUIRED",
     });
   } catch (err) {
     console.error("TO BANK STATUS ERROR:", err);
