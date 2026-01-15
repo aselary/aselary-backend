@@ -197,28 +197,31 @@ if (!wallet) {
          
  const internalNuban = wallet.internalNuban || null;
       
-let counterpartyName = "Paystack"; // default fallback
+let counterpartyName = "Paystack"; // final fallback
 
 if (data.channel === "dedicated_nuban") {
- let senderName = data.sender_name;
-let senderBank = data.sender_bank;
+  const senderName =
+    data.authorization?.sender_name ||
+    data.authorization?.sender_bank ||
+    "Bank Transfer";
 
-// clean fallback
-if (!senderName && senderBank) {
-  senderName = senderBank;
+  counterpartyName = senderName;
 }
 
-if (!senderName && !senderBank) {
-  senderName = "Bank Transfer";
-}
-  counterpartyName = `${senderName}`;
-}
 else if (data.channel === "card") {
   counterpartyName = `${data.authorization?.bank || data.authorization?.brand || "Card Payment"}`;
 }
 else if (data.channel === "ussd") {
   counterpartyName = `${data.authorization?.bank || "USSD / Paystack"}`;
 }
+
+
+console.log("WEBHOOK SENDER DEBUG:", {
+  channel: data.channel,
+  sender_name: data.authorization?.sender_name,
+  sender_bank: data.authorization?.sender_bank,
+  counterpartyName,
+});
 
      await Ledger.create({
   userId: user._id,
