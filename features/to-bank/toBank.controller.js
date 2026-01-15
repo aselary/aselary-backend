@@ -195,37 +195,7 @@ if (!recipientCode) {
   reason: narration,
 });
 
-if (init.requiresOtp) {
-  // 1️⃣ Update ONLY what is needed for OTP
-  await ToBankTransaction.findOneAndUpdate(
-    { reference },
-    {
-      status: "OTP_REQUIRED",
-      transferCode: init.transferCode,
-      requiresOtp: true,
-    },
-    { session }
-  );
 
-  await ActivityLog.findOneAndUpdate(
-    { reference },
-    { status: "PROCESSING" },
-    { session }
-  );
-
-  await session.commitTransaction();
-  session.endSession();
-
-  // ⛔ ABSOLUTE STOP
-  return res.status(200).json({
-    success: true,
-    message: "OTP required to complete transfer",
-    data: {
-      reference,
-      requiresOtp: true,
-    },
-  });
-}
   if (isDev) {
 console.log("📒 STEP 6: Creating ActivityLog...");
   }
@@ -307,6 +277,38 @@ await Transaction.create(
   ],
   { session }
 );
+
+if (init.requiresOtp) {
+  // 1️⃣ Update ONLY what is needed for OTP
+  await ToBankTransaction.findOneAndUpdate(
+    { reference },
+    {
+      status: "OTP_REQUIRED",
+      transferCode: init.transferCode,
+      requiresOtp: true,
+    },
+    { session }
+  );
+
+  await ActivityLog.findOneAndUpdate(
+    { reference },
+    { status: "PROCESSING" },
+    { session }
+  );
+
+  await session.commitTransaction();
+  session.endSession();
+
+  // ⛔ ABSOLUTE STOP
+  return res.status(200).json({
+    success: true,
+    message: "OTP required to complete transfer",
+    data: {
+      reference,
+      requiresOtp: true,
+    },
+  });
+}
 
     // 9️⃣ Commit
     await session.commitTransaction();
