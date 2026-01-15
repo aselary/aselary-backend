@@ -200,7 +200,7 @@ if (init.requiresOtp) {
   await ToBankTransaction.findOneAndUpdate(
     { reference },
     {
-      status: "PROCESSING",
+      status: "OTP_REQUIRED",
       transferCode: init.transferCode,
       requiresOtp: true,
     },
@@ -633,7 +633,7 @@ export const verifyToBankOtp = async (req, res) => {
     }
 
     // 2️⃣ Guard: must be waiting for OTP
-    if (tx.status !== "PROCESSING") {
+    if (tx.status !== "OTP_REQUIRED") {
       return res.status(400).json({
         message: "Transaction not awaiting OTP",
       });
@@ -655,14 +655,14 @@ export const verifyToBankOtp = async (req, res) => {
       }
     );
 
-    if (response?.data?.status) {
+    if (!response?.data?.status) {
       return res.status(400).json({
         message: "OTP verification failed",
       });
     }
 
     // 4️⃣ Mark OTP verified
-    tx.status = "PROCESSING";
+    tx.status = "OTP_VERIFIED";
     tx.otpVerifiedAt = new Date();
     await tx.save();
 
