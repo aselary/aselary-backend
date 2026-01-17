@@ -153,6 +153,7 @@ if (!user) {
   return res.sendStatus(200);
 }
 
+
       /* -------------------------------------------------
        * 5. FIND OR CREATE WALLET
        * ------------------------------------------------- */
@@ -162,6 +163,8 @@ if (!wallet) {
   console.log("⚠️ Wallet not found for user", user._id);
   return res.sendStatus(200);
 }
+
+ const internalNuban = wallet.internalNuban || null;
 
       /* -------------------------------------------------
        * 6. PREVENT DUPLICATE CREDIT
@@ -253,8 +256,6 @@ if (amount < MIN_DEPOSIT) {
       console.log("AMOUNT:", amount);
          
          
- const internalNuban = wallet.internalNuban || null;
-      
 let counterpartyName = "Paystack"; // final fallback
 
 if (data.channel === "dedicated_nuban") {
