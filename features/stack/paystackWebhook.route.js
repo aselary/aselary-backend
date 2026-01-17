@@ -17,10 +17,8 @@ router.post(
     
 
     try {
-      const MIN_DEPOSIT = 1000
-      /* -------------------------------------------------
-       * 1. VERIFY PAYSTACK SIGNATURE
-       * ------------------------------------------------- */
+      const MIN_DEPOSIT = 950
+     
       const hash = crypto
         .createHmac("sha512", process.env.PAYSTACK_SECRET_KEY)
         .update(req.body)
@@ -270,7 +268,7 @@ if (amount < MIN_DEPOSIT) {
     amount,
     reference: data.reference,
     status: "PENDING",
-   narration: `Deposit below ₦${MIN_DEPOSIT} minimum. Amount will remain pending and will NOT be credited.`,
+    narration: `Deposit below required minimum. Amount will remain pending and will NOT be credited.`,
     counterpartyName,
   });
 

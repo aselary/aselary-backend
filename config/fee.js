@@ -18,9 +18,28 @@ export const A2A_FEES = [
   { min: 500001, max: 1000000, fee: 70 },
 ];
 
+// TO BANK (WITHDRAWAL) FEES — VERSION 1
+// Flat, predictable, safe
+
 export const TO_BANK_FEES = [
-  { min: 1, max: 5000, fee: 10 },
-  { min: 5001, max: 50000, fee: 20 },
-  { min: 50001, max: 200000, fee: 30 },
-  { min: 200001, max: 1000000, fee: 50 }, // cap
+  {
+    min: 1,
+    max: 4999,
+    fee: 30,
+  },
+  {
+    min: 5000,
+    max: 19999,
+    fee: 50,
+  },
+  {
+    min: 20000,
+    max: 199999,
+    fee: 80,
+  },
+  {
+    min: 200000,
+    max: Infinity,
+    fee: 120,
+  },
 ];
