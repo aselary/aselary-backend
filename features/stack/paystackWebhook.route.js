@@ -246,12 +246,12 @@ if (amount < MIN_DEPOSIT) {
       const balanceAfter = wallet.balance;
 
      
-         if (isDev) {
+
       console.log("ACCOUNT NUMBER:", accountNumber);
       console.log("USER FOUND:", true);
       console.log("WALLET FOUND:", true);
       console.log("AMOUNT:", amount);
-         }
+         
          
  const internalNuban = wallet.internalNuban || null;
       
@@ -344,9 +344,9 @@ console.log("WEBHOOK SENDER DEBUG:", {
 });
 
     } catch (err) {
-      if (isDev) {
+    
       console.error("❌ LEDGER FAILURE:", err.message);
-      }
+      
       return res.sendStatus(200); // NEVER fail webhook
     }
   }
