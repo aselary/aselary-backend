@@ -489,23 +489,6 @@ export const completeToBankTransfer = async (req, res) => {
         { session }
       );
 
-      const platformBalance = await platformBalance.findOneAndUpdate(
-  { environment: "production" },
-  {
-    $inc: {
-      balance: fee,
-      totalFeesCollected: fee,
-    },
-    $set: {
-      lastUpdatedReason: "TO_BANK_FEE",
-    },
-  },
-  { session, new: true }
-);
-
-if (!platformBalance) {
-  throw new Error("Platform balance row missing");
-}
 
        await addPlatformFee(
         {
