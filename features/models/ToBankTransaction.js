@@ -14,9 +14,20 @@ const toBankTransactionSchema = new mongoose.Schema(
     },
 
     amount: {
-      type: Number,
-      required: true,
-    },
+  type: Number,
+  required: true,
+},
+
+fee: {
+  type: Number,
+  required: true,
+  default: 0,
+},
+
+totalDebit: {
+  type: Number,
+  required: true,
+},
 
     bankName: {
       type: String,
