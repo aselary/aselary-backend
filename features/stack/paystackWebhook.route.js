@@ -270,7 +270,7 @@ if (amount < MIN_DEPOSIT) {
     amount,
     reference: data.reference,
     status: "PENDING",
-    narration: `Deposit received but below minimum (₦${MIN_DEPOSIT})`,
+   narration: `Deposit below ₦${MIN_DEPOSIT} minimum. Amount will remain pending and will NOT be credited.`,
     counterpartyName,
   });
 
