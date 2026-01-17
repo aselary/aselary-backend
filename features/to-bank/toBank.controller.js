@@ -357,31 +357,22 @@ if (init.requiresOtp) {
 
 export const completeToBankTransfer = async (req, res) => {
   const { reference } = req.body;
-
   const session = await mongoose.startSession();
+
   session.startTransaction();
-    if (isDev) {
-  console.log("[COMPLETE_TO_BANK] START", { reference });
-    }
+
   try {
-    
+    // 1️⃣ Fetch transaction
     const tx = await ToBankTransaction.findOne({ reference }).session(session);
-    if (isDev) {
-    console.log("[COMPLETE_TO_BANK] TX FOUND", {
-  id: tx?._id,
-  status: tx?.status,
-  amount: tx?.amount,
-  fee: tx?.fee,
-  walletId: tx?.walletId,
+    if (!tx) throw new Error("Transaction not found");
+   console.log("[DEBUG TX]", {
+  id: tx._id,
+  status: tx.status,
+  amount: tx.amount,
+  fee: tx.fee,
+  walletId: tx.walletId,
+  userId: tx.userId,
 });
-}
-
-
-    if (!tx) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(404).json({ message: "Transaction not found" });
-    }
 
      if (tx.status !== "OTP_VERIFIED") {
   await session.abortTransaction();
@@ -390,105 +381,135 @@ export const completeToBankTransfer = async (req, res) => {
     message: "OTP not verified",
   });
 }
-     if (isDev) {
-    console.log("[COMPLETE_TO_BANK] STATUS CHECK PASSED", tx.status);
-     }
-   if (!["OTP_VERIFIED", "PROCESSING"].includes(tx.status)) {
-  await session.abortTransaction();
-  session.endSession();
-  return res.status(400).json({
-    message: "Transaction already resolved"
-  });
-}
+ if (!["OTP_VERIFIED", "PROCESSING"].includes(tx.status)) {
+      throw new Error("Transaction already resolved");
+    }
 
-
+    // 2️⃣ Fetch wallet
     const wallet = await Wallet.findById(tx.walletId)
       .select("balance internalNuban accountNumber")
       .session(session);
 
-    if (!wallet) {
-      throw new Error("Wallet not found");
-    }
-   if (isDev) {
-    console.log("[COMPLETE_TO_BANK] WALLET FOUND", {
-  walletId: wallet?._id,
-  balance: wallet?.balance,
-  internalNuban: wallet?.internalNuban,
-});
-   }
+    if (!wallet) throw new Error("Wallet not found");
 
-    
+    console.log("[DEBUG WALLET BEFORE]", {
+  walletId: wallet._id,
+  balance: wallet.balance,
+  internalNuban: wallet.internalNuban,
+});
+
+    // 3️⃣ Numbers (authoritative)
     const balanceBefore = wallet.balance;
+    const amount = tx.amount;
     const fee = tx.fee || 0;
-    const totalDebit = tx.amount + fee;
+    const totalDebit = amount + fee;
 
     if (wallet.balance < totalDebit) {
       throw new Error("Insufficient balance");
     }
 
-    
-    wallet.balance -= totalDebit;
-    if (isDev) {
-    console.log("[COMPLETE_TO_BANK] DEBIT CALC", {
+
+    console.log("[DEBUG DEBIT CALC]", {
   balanceBefore,
-  amount: tx.amount,
+  amount,
   fee,
   totalDebit,
+  expectedAfter: balanceBefore - totalDebit,
 });
-    }
+    // 4️⃣ Debit wallet ONCE
+    wallet.balance -= totalDebit;
     await wallet.save({ session });
-    if (isDev) {
-    console.log("[COMPLETE_TO_BANK] WALLET DEBITED", {
-  balanceAfter: wallet.balance,
+    console.log("[DEBUG WALLET AFTER]", {
+  walletId: wallet._id,
+  balance: wallet.balance,
 });
-    }
 
     const balanceAfter = wallet.balance;
 
-    
-
-   await Ledger.create(
-  [
-    {
-      userId: tx.userId,
-      walletId: wallet._id,
-      internalNuban: wallet.internalNuban,
-      accountNumber: wallet.accountNumber,
-      type: "DEBIT",
-      source: "TO_BANK",
-      amount: tx.amount,
-      balanceBefore,
-      balanceAfter,
-      narration: tx.narration,
-      reference,
-    }
-  ],
-  { session }
-);
-
-    
-    if (fee > 0) {
-      if (isDev) {
-    console.log("[COMPLETE_TO_BANK] FEE PROCESSED", { fee });
-      }
-      await Ledger.create(
+    console.log("[DEBUG LEDGER TRANSFER]", {
+  balanceBefore,
+  amount,
+  balanceAfterExpected: balanceBefore - amount,
+});
+    // 5️⃣ User ledger — TRANSFER
+    await Ledger.create(
       [
-         {
+        {
           userId: tx.userId,
           walletId: wallet._id,
           internalNuban: wallet.internalNuban,
+          accountNumber: wallet.accountNumber,
           type: "DEBIT",
-          source: "TO_BANK_FEE",
-          amount: fee,
-          balanceBefore: balanceAfter,
-          balanceAfter: balanceAfter,
-          narration: "Transfer service fee",
+          source: "TO_BANK",
+          amount,
+          balanceBefore,
+          balanceAfter: balanceBefore - amount,
+          narration: tx.narration || "Transfer to bank",
           reference,
         },
       ],
+      { session }
+    );
+
+
+    console.log("[DEBUG LEDGER FEE]", {
+  fee,
+  balanceBeforeFee: balanceBefore - amount,
+  balanceAfterFee: balanceAfter,
+});
+    // 6️⃣ User ledger — FEE
+    if (fee > 0) {
+      await Ledger.create(
+        [
+          {
+            userId: tx.userId,
+            walletId: wallet._id,
+            internalNuban: wallet.internalNuban,
+            type: "DEBIT",
+            source: "TO_BANK_FEE",
+            amount: fee,
+            balanceBefore: balanceBefore - amount,
+            balanceAfter,
+            narration: "Transfer service fee",
+            reference,
+          },
+        ],
         { session }
       );
+    }
 
+    // 7️⃣ Platform credit (fee)
+    if (fee > 0) {
+      await PlatformBalance.findOneAndUpdate(
+        { environment: "production" },
+        {
+          $inc: {
+            balance: fee,
+            totalFeesCollected: fee,
+          },
+          $set: {
+            lastUpdatedReason: "TO_BANK_FEE",
+          },
+        },
+        { session }
+      );
+  }
+
+    // 7️⃣ Platform credit (fee)
+    if (fee > 0) {
+      await PlatformBalance.findOneAndUpdate(
+        { environment: "production" },
+        {
+          $inc: {
+            balance: fee,
+            totalFeesCollected: fee,
+          },
+          $set: {
+            lastUpdatedReason: "TO_BANK_FEE",
+          },
+        },
+        { session }
+      );
 
        await addPlatformFee(
         {
@@ -503,6 +524,7 @@ export const completeToBankTransfer = async (req, res) => {
         session
       );
     }
+
    await PlatformLedger.create(
   [
     {
@@ -519,6 +541,7 @@ export const completeToBankTransfer = async (req, res) => {
   ],
   { session }
 );
+
  
     
     tx.status = "SUCCESS";
@@ -542,10 +565,9 @@ export const completeToBankTransfer = async (req, res) => {
       { session }
     );
 
+  
+    // 9️⃣ Commit
     await session.commitTransaction();
-    if (isDev) {
-    console.log("[COMPLETE_TO_BANK] COMMITTING TRANSACTION");
-    }
     session.endSession();
 
     return res.json({
@@ -553,20 +575,17 @@ export const completeToBankTransfer = async (req, res) => {
       message: "Transfer settled successfully",
       reference,
     });
+
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-     if (isDev) {
-    console.error("COMPLETE TO BANK ERROR:", error);
-     }
-     
 
-    return res.status(500).json({
-      message: error.message || "Internal server error",
+    return res.status(400).json({
+      success: false,
+      message: error.message,
     });
   }
 };
-
 
 
 
