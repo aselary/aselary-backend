@@ -17,6 +17,7 @@ router.post(
     }
 
     try {
+      const MIN_DEPOSIT = 1000
       /* -------------------------------------------------
        * 1. VERIFY PAYSTACK SIGNATURE
        * ------------------------------------------------- */
@@ -180,7 +181,64 @@ if (!wallet) {
       /* -------------------------------------------------
        * 7. CREDIT WALLET
        * ------------------------------------------------- */
-      const amount = data.amount / 100;
+  const gross = data.amount;      // kobo
+  const fee = data.fees || 0;     // kobo
+  const net = gross - fee;        // kobo
+
+const amount = net / 100;       // NAIRA (REAL MONEY)
+
+// 🚧 MINIMUM DEPOSIT GUARD
+if (amount < MIN_DEPOSIT) {
+  if (isDev) {
+    console.log("⚠️ Deposit below minimum", {
+      amount,
+      min: MIN_DEPOSIT,
+      reference: data.reference,
+    });
+  }
+
+  // CREATE LEDGER (but do NOT credit wallet)
+  await Ledger.create({
+    userId: user._id,
+    walletId: wallet._id,
+    accountNumber,
+    internalNuban,
+    type: "CREDIT",
+    source: "paystack",
+    amount,
+    balanceBefore: wallet.balance,
+    balanceAfter: wallet.balance, // unchanged
+    reference: data.reference,
+    status: "PENDING", // IMPORTANT
+    narration: "Deposit below minimum threshold",
+    metadata: {
+      provider: "paystack",
+      paidAt: data.paid_at,
+      held: true,
+      requiredAmount: MIN_DEPOSIT,
+    },
+  });
+
+  // ACTIVITY LOG (user can see it)
+  await ActivityLog.create({
+    userId: user._id,
+    actorId: user._id,
+    walletId: wallet._id,
+
+    category: "DEPOSIT",
+    channel: "BANK_TRANSFER",
+    type: "DEPOSIT",
+    direction: "CREDIT",
+
+    amount,
+    reference: data.reference,
+    status: "PENDING",
+    narration: `Deposit received but below minimum (₦${MIN_DEPOSIT})`,
+    counterpartyName,
+  });
+
+  return res.sendStatus(200);
+}
 
       const balanceBefore = wallet.balance;
       wallet.balance += amount;
