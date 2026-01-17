@@ -12,9 +12,9 @@ router.post(
   "/",
   express.raw({ type: "application/json" }),
   async (req, res) => {
-    if (isDev) {
+    
     console.log("🔥 PAYSTACK WEBHOOK HIT");
-    }
+    
 
     try {
       const MIN_DEPOSIT = 1000
