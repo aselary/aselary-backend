@@ -181,6 +181,40 @@ if (!wallet) {
         return res.sendStatus(200);
       }
 
+
+      let counterpartyName = "Paystack"; // final fallback
+
+if (data.channel === "dedicated_nuban") {
+  const senderName = data.authorization?.sender_name?.trim();
+  const senderBank = data.authorization?.sender_bank?.trim();
+
+  if (senderName && senderBank) {
+    counterpartyName = `${senderName} • ${senderBank}`;
+  } else if (senderName) {
+    counterpartyName = senderName;
+  } else if (senderBank) {
+    counterpartyName = senderBank;
+  } else {
+    counterpartyName = "Bank Transfer";
+  }
+}
+
+else if (data.channel === "card") {
+  counterpartyName = `${data.authorization?.bank || data.authorization?.brand || "Card Payment"}`;
+}
+else if (data.channel === "ussd") {
+  counterpartyName = `${data.authorization?.bank || "USSD / Paystack"}`;
+}
+
+if (isDev) {
+console.log("WEBHOOK SENDER DEBUG:", {
+  channel: data.channel,
+  sender_name: data.authorization?.sender_name,
+  sender_bank: data.authorization?.sender_bank,
+  counterpartyName,
+});
+}
+
       /* -------------------------------------------------
        * 7. CREDIT WALLET
        * ------------------------------------------------- */
@@ -256,38 +290,7 @@ if (amount < MIN_DEPOSIT) {
       console.log("AMOUNT:", amount);
          
          
-let counterpartyName = "Paystack"; // final fallback
 
-if (data.channel === "dedicated_nuban") {
-  const senderName = data.authorization?.sender_name?.trim();
-  const senderBank = data.authorization?.sender_bank?.trim();
-
-  if (senderName && senderBank) {
-    counterpartyName = `${senderName} • ${senderBank}`;
-  } else if (senderName) {
-    counterpartyName = senderName;
-  } else if (senderBank) {
-    counterpartyName = senderBank;
-  } else {
-    counterpartyName = "Bank Transfer";
-  }
-}
-
-else if (data.channel === "card") {
-  counterpartyName = `${data.authorization?.bank || data.authorization?.brand || "Card Payment"}`;
-}
-else if (data.channel === "ussd") {
-  counterpartyName = `${data.authorization?.bank || "USSD / Paystack"}`;
-}
-
-if (isDev) {
-console.log("WEBHOOK SENDER DEBUG:", {
-  channel: data.channel,
-  sender_name: data.authorization?.sender_name,
-  sender_bank: data.authorization?.sender_bank,
-  counterpartyName,
-});
-}
 
      await Ledger.create({
   userId: user._id,
