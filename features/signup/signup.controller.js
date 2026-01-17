@@ -272,7 +272,9 @@ try {
     });
 
  } catch (err) {
+  if (isDev) {
   console.error("OTP EMAIL FAILED:", err.message);
+  }
 }
 
 // 4. ALWAYS return success
@@ -288,8 +290,9 @@ return res.status(201).json({
   token,
 });
   } catch (error) {
-
+    if (isDev) {
     console.error("SIGNUP ERROR:", error);
+    }
     
     return res.status(500).json({ message: "Server error. Try again." });
   }

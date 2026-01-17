@@ -32,11 +32,19 @@ export const TO_BANK_FEES = [
     max: 19999,
     fee: 50,
   },
+  
   {
     min: 20000,
-    max: 199999,
-    fee: 80,
+    max:  59999,
+    fee: 50,
   },
+
+   {
+    min: 60000,
+    max: 199999,
+    fee: 70,
+  },
+
   {
     min: 200000,
     max: Infinity,

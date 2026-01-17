@@ -13,7 +13,9 @@ router.post(
   express.raw({ type: "application/json" }),
   async (req, res) => {
     
+    if (isDev) {
     console.log("🔥 PAYSTACK WEBHOOK HIT");
+    }
     
 
     try {
@@ -158,7 +160,9 @@ if (!user) {
       let wallet = await Wallet.findOne({ userId: user._id });
 
 if (!wallet) {
+  if (isDev) {
   console.log("⚠️ Wallet not found for user", user._id);
+  }
   return res.sendStatus(200);
 }
 
@@ -281,12 +285,12 @@ if (amount < MIN_DEPOSIT) {
       const balanceAfter = wallet.balance;
 
      
-
+ if (isDev) {
       console.log("ACCOUNT NUMBER:", accountNumber);
       console.log("USER FOUND:", true);
       console.log("WALLET FOUND:", true);
       console.log("AMOUNT:", amount);
-         
+ }
          
 
 
@@ -346,8 +350,9 @@ if (amount < MIN_DEPOSIT) {
 });
 
     } catch (err) {
-    
+     if (isDev) {
       console.error("❌ LEDGER FAILURE:", err.message);
+     }
       
       return res.sendStatus(200); // NEVER fail webhook
     }

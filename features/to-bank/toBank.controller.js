@@ -445,6 +445,8 @@ export const completeToBankTransfer = async (req, res) => {
 
     const balanceAfter = wallet.balance;
 
+    
+
    await Ledger.create(
   [
     {
@@ -487,8 +489,25 @@ export const completeToBankTransfer = async (req, res) => {
         { session }
       );
 
-      
-      await addPlatformFee(
+      const platformBalance = await platformBalance.findOneAndUpdate(
+  { environment: "production" },
+  {
+    $inc: {
+      balance: fee,
+      totalFeesCollected: fee,
+    },
+    $set: {
+      lastUpdatedReason: "TO_BANK_FEE",
+    },
+  },
+  { session, new: true }
+);
+
+if (!platformBalance) {
+  throw new Error("Platform balance row missing");
+}
+
+       await addPlatformFee(
         {
           source: "TO_BANK",
           amount: fee,
@@ -696,7 +715,9 @@ export const verifyToBankOtp = async (req, res) => {
     });
 
   } catch (error) {
+    if (isDev) {
     console.error("VERIFY TO BANK OTP ERROR:", error);
+    }
 
     return res.status(500).json({
       message: error.message || "Internal server error",
@@ -731,7 +752,9 @@ export const toBankStatus = async (req, res) => {
       requiresOtp: txn.status === "OTP_REQUIRED",
     });
   } catch (err) {
+    if (isDev) {
     console.error("TO BANK STATUS ERROR:", err);
+    }
     return res.status(500).json({
       success: false,
       message: "Failed to fetch transfer status",
