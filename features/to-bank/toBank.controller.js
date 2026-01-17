@@ -295,7 +295,7 @@ if (init.requiresOtp) {
 
   await ActivityLog.findOneAndUpdate(
     { reference },
-    { status: "PROCESSING" },
+    { status: "PENDING" },
     { session }
   );
 
@@ -395,7 +395,7 @@ export const completeToBankTransfer = async (req, res) => {
      if (isDev) {
     console.log("[COMPLETE_TO_BANK] STATUS CHECK PASSED", tx.status);
      }
-   if (!["OTP_VERIFIED", "PROCESSING"].includes(tx.status)) {
+   if (!["OTP_VERIFIED", "PENDING"].includes(tx.status)) {
   await session.abortTransaction();
   session.endSession();
   return res.status(400).json({
