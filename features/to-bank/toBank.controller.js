@@ -160,6 +160,8 @@ if (isDev) {
     userId,
     walletId: wallet._id,          // 🔥 REQUIRED
     amount,
+    fee,
+    totalDebit,
     bankName,
     bankCode,
     accountNumber,
