@@ -47,7 +47,9 @@ export const verifyEmail = async (req, res) => {
 try {
   await createWalletInfrastructureOnSignup(user);
 } catch (err) {
+  if (isDev) {
   console.error("WALLET CREATE ERROR:", err); // ✅ MUST LOG
+  }
   return res.status(500).json({
     message: "Wallet creation failed. Please contact support."
   });

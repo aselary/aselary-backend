@@ -1,26 +1,33 @@
-import axios from "axios";
+import isDev from "../utils/isDev.js";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 const USE_MOCK_BANK = process.env.USE_MOCK_BANK === "true";
 
 export const getBanks = async (req, res) => {
   try {
-    const response = await axios.get(
-      "https://api.paystack.co/bank",
-      {
-        headers: {
-          Authorization: `Bearer ${PAYSTACK_SECRET}`,
-        },
-      }
-    );
+   const response = await fetch("https://api.paystack.co/bank", {
+  method: "GET",
+  headers: {
+    Authorization: `Bearer ${PAYSTACK_SECRET}`,
+    "Content-Type": "application/json",
+  },
+});
 
-    return res.json({
-      success: true,
-      data: response.data.data.map(bank => ({
-        name: bank.name,
-        code: bank.code,
-      })),
-    });
+const data = await response.json();
+
+if (!response.ok) {
+  throw new Error(data.message || "Failed to fetch banks");
+}
+
+  const banks = data.data.map(bank => ({
+  name: bank.name,
+  code: bank.code,
+}));
+
+return res.json({
+  success: true,
+  data: banks,
+});
   } catch (err) {
     return res.status(500).json({
       success: false,
@@ -30,7 +37,9 @@ export const getBanks = async (req, res) => {
 };
 
 export const resolveBankAccount = async (req, res) => {
+  if (isDev) {
     console.log("BODY:", req.body);
+  }
   const { accountNumber, bankCode } = req.body;
 
   if (!accountNumber || !bankCode) {
@@ -52,27 +61,34 @@ export const resolveBankAccount = async (req, res) => {
   }
 
   try {
-    const response = await axios.get(
-      `https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
-      {
-        headers: {
-          Authorization: `Bearer ${PAYSTACK_SECRET}`,
-        },
-      }
-    );
+   const response = await fetch(
+  `https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
+  {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${PAYSTACK_SECRET}`,
+      "Content-Type": "application/json",
+    },
+  }
+);
 
+const data = await response.json();
+
+if (!response.ok) {
+  throw new Error(data.message || "Unable to resolve account");
+}
     return res.json({
       success: true,
-      accountName: response.data.data.account_name,
+      accountName: data.data.account_name,
     });
   } catch (err) {
-  console.error("PAYSTACK ERROR:", err.response?.data || err.message);
+  if (isDev) {
+    console.error("PAYSTACK ERROR:", err.message);
+  }
 
-  return res.status(err.response?.status || 500).json({
+  return res.status(500).json({
     success: false,
-    message:
-      err.response?.data?.message ||
-      "Unable to resolve account",
+    message: err.message || "Unable to resolve account",
   });
 }
 };

@@ -544,8 +544,8 @@ export const completeToBankTransfer = async (req, res) => {
 
     await session.commitTransaction();
     if (isDev) {
-      }
     console.log("[COMPLETE_TO_BANK] COMMITTING TRANSACTION");
+          }
     session.endSession();
 
     return res.json({
@@ -556,8 +556,9 @@ export const completeToBankTransfer = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-     
+     if (isDev) {
     console.error("COMPLETE TO BANK ERROR:", error);
+     }
      
 
     return res.status(500).json({

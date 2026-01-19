@@ -165,33 +165,30 @@ const ussdLimiter = rateLimit({
 });
 
 
-// Run every 1 minute
-setInterval(async () => {
-  try {
-    await expirePendingTransactions();
-    await expirePendingToBank();
-  } catch (err) {
-    console.error("Auto-expire job failed:", err);
-  }
-}, 60 * 1000);
-
-
-// 🛡️ MongoDB connection
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
-    if (isDev) {
+   if (isDev) {
       console.log("✅ MongoDB connected");
     }
+
+    // ✅ START JOB ONLY AFTER DB IS READY
+    setInterval(async () => {
+      try {
+        await expirePendingTransactions();
+        await expirePendingToBank();
+      } catch (err) {
+        console.error("Auto-expire job failed:", err);
+      }
+    }, 60 * 1000);
   })
-  .catch((error) => {
-    if (isDev) {
-      console.error("❌ MongoDB connection error:", error.message);
-    } else {
-      console.error("❌ MongoDB failed. Shutting down.");
-      process.exit(1);
-    }
+  .catch(err => {
+       if (isDev) {
+    console.error("❌ MongoDB failed. Shutting down.", err);
+       }
+    process.exit(1);
   });
+
            
 
 

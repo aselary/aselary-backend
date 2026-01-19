@@ -11,6 +11,7 @@ export const expirePendingTransactions = async () => {
   const result = await Transaction.updateMany(
     {
       status: "pending",
+      type: { $ne: "TO_BANK" },
       createdAt: { $lt: expiryTime },
     },
     {
