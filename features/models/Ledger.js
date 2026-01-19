@@ -55,7 +55,7 @@ const ledgerSchema = new mongoose.Schema(
 
     reference: {
       type: String,
-      unique: true,
+      index: true,
       required: true,
     },
 
