@@ -46,6 +46,8 @@ import { expirePendingTransactions } from "./src/jobs/expirePendingTransactions.
 import { expirePendingToBank } from "./src/jobs/expirePendingToBank.js";
 import profileRoutes from "./features/profile/profile.route.js";
 import resetSignupRoutes from "./features/resetSignup/resetSignup.route.js";
+import planRoutes from "./features/plan/planRoutes.js";
+import recordRoutes from "./features/record/recordRoutes.js";
 
  /* <============================  ADMIN IMPORT ================================> */
 import adminLoginRoute from "./admin-backend/features/adminLogin/adminLoginRoute.js";
@@ -252,6 +254,8 @@ app.use("/api/auth", verifyPhoneOTPRoutes);
 app.use("/api/auth", resendPhoneRoutes);
 app.use("/api/auth", resetSignupRoutes);
 app.use("/api/transfer", a2aTransferRoutes);
+app.use("/api/plans", planRoutes);
+app.use("/api/records", recordRoutes);
 app.use("/api", bankRoutes);
 app.use("/api/activity", activityLogRoutes);
 app.use("/api/transfer", toBankRoutes);
