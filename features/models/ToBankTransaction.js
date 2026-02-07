@@ -8,6 +8,14 @@ const toBankTransactionSchema = new mongoose.Schema(
       index: true,
     },
 
+
+        planId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Plan",
+          index: true,
+        },
+
+
     walletId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
@@ -18,11 +26,11 @@ const toBankTransactionSchema = new mongoose.Schema(
   required: true,
 },
 
-fee: {
-  type: Number,
-  required: true,
-  default: 0,
-},
+   fee: {
+     type: Number,
+     required: true,
+     default: 0,
+   },
 
 totalDebit: {
   type: Number,
@@ -57,7 +65,7 @@ totalDebit: {
 
     status: {
       type: String,
-      enum: ["PENDING", "PROCESSING", "SUCCESS", "FAILED", "REVERSED", "OTP_REQUIRED", "OTP_VERIFIED",],
+      enum: ["PENDING", "PROCESSING", "SUCCESS", "FAILED", "REVERSED", "OTP_REQUIRED", "OTP_VERIFIED", "WITHDRAW_FUND", ],
       default: "PENDING",
       index: true,
     },

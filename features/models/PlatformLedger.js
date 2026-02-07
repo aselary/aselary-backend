@@ -17,7 +17,7 @@ const platformLedgerSchema = new mongoose.Schema(
 
     source: {
       type: String,
-      enum: ["A2A", "TO_BANK", "DEPOSIT", "ADJUSTMENT"],
+      enum: ["A2A", "TO_BANK", "DEPOSIT", "ADJUSTMENT", "EARLY_WITHDRAW", "WITHDRAW_FUND"],
       required: true,
     },
 
@@ -25,6 +25,8 @@ const platformLedgerSchema = new mongoose.Schema(
       type: String,
       enum: [
         "PLATFORM_FEE",
+        "PENALTY",
+        "WITHDRAW_FEE",
         "BANK_SETTLEMENT",
         "MANUAL_ADJUSTMENT",
       ],

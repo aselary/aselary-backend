@@ -1,25 +1,30 @@
 import mongoose from "mongoose";
-import Wallet from "../models/Wallet.js";
 import Ledger from "../models/Ledger.js";
 import ToBankTransaction from "../models/ToBankTransaction.js";
 import ActivityLog from "../models/ActivityLog.js";
 import Transaction from "../models/Transaction.js";
 import addPlatformFee from "../utils/addPlatformFee.js";
 import PlatformLedger from "../models/PlatformLedger.js";
-import { calculateFee } from "../utils/calculateFee.js";
-import { TO_BANK_FEES } from "../../config/fee.js";
+import Wallet from "../models/Wallet.js";
 import { LIMITS } from "../../config/limits.js";
+import { EARLY_WITHDRAW_PENALTY } from "../../config/penalty.js";
+import Plan from "../models/Plan.js";
 import { getDailyTransferTotal } from "../utils/getDailyTransferTotal.js";
 import { createTransferRecipient } from "../transfer/createRecipient.js";
 import { initiatePaystackTransfer } from "../transfer/initiateTransfer.js";
 import isDev from "../utils/isDev.js";
 import { paystackRequest }from "../utils/paystack.js";
 
-export const toBankTransfer = async (req, res) => {
+export const earlyWithdraw = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     const userId = req.user.id;
+     const { planId } = req.body;
+
+console.log("🟡 RAW req.body:", req.body);
+console.log("🟡 planId from body:", planId);
+console.log("🟡 typeof planId:", typeof planId);
     const {
       amount,
       bankName,
@@ -28,7 +33,7 @@ export const toBankTransfer = async (req, res) => {
       accountName,
       narration,
     } = req.body;
-    
+
     if (isDev) {
  console.log("📦 STEP 1: BODY", {
   amount,
@@ -49,53 +54,44 @@ export const toBankTransfer = async (req, res) => {
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
-  
 
    if (!Number(amount) || Number(amount) <= 0) {
   return res.status(400).json({ message: "Invalid amount" });
  }
 
          // 4️⃣ Generate reference
-   const reference = `TB-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+   const reference = `EW-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
    if (isDev) {
    console.log("🔖 STEP 2: REFERENCE =", reference);
 console.log("🔍 STEP 3: Checking pending transaction...");
    }
-  try {
-    const existing = await ToBankTransaction.findOne({
-  userId,
-  status: "PENDING",
-   }).session(session);
 
-    if (existing) {
-  return res.status(400).json({
-    message: "You have a pending transfer. Please wait.",
-  });
- }
- if (isDev) {
- console.log("📌 STEP 3 RESULT: existing =", existing);
- }
+    let penalty = 0;
+  if (EARLY_WITHDRAW_PENALTY.type === "percentage") {
+  penalty = (amount * EARLY_WITHDRAW_PENALTY.value) / 100;
+   } else {
+    penalty = EARLY_WITHDRAW_PENALTY.value;
+   }
 
-    const fee = calculateFee(amount, TO_BANK_FEES);
-    const totalDebit = amount + fee;
+const totalDebit = amount + penalty;
     if (isDev) {
-     console.log("💸 STEP 4: fee & totalDebit", { fee, totalDebit });
+     console.log("💸 STEP 4: fee & totalDebit", { penalty, totalDebit });
     }
 
 // 1️⃣ Per-transaction limit
 if (amount > LIMITS.TO_BANK.maxPerTransaction) {
   return res.status(400).json({
-    message: `To Bank limit is ₦${LIMITS.TO_BANK.maxPerTransaction.toLocaleString()} per transaction`,
+    message: `Early withdraw limit is ₦${LIMITS.TO_BANK.maxPerTransaction.toLocaleString()} per transaction`,
   });
 }
    const dailyTotal = await getDailyTransferTotal({
   userId,
-  type: "TO_BANK",
+  type: "EARLY_WITHDRAW",
 });
 
 if (dailyTotal + amount > LIMITS.TO_BANK.maxDailyTotal) {
   return res.status(403).json({
-    message: `Daily to-bank limit is ₦${LIMITS.TO_BANK.maxDailyTotal.toLocaleString()}`,
+    message: `Daily early withdraw limit is ₦${LIMITS.TO_BANK.maxDailyTotal.toLocaleString()}`,
   });
 }
 
@@ -104,7 +100,7 @@ startOfDay.setHours(0, 0, 0, 0);
 
 const sameBankCount = await Transaction.countDocuments({
   userId,
-  type: "TO_BANK",
+  type: "EARLY_WITHDRAW",
   status: "SUCCESS",
   bankCode,
   accountNumber,
@@ -120,7 +116,7 @@ if (sameBankCount >= LIMITS.TO_BANK.maxSameBankPerDay) {
 if (amount >= LIMITS.TO_BANK.cooldown.thresholdAmount) {
   const lastBigTransfer = await Transaction.findOne({
     userId,
-    type: "TO_BANK",
+    type: "EARLY_WITHDRAW",
     status: "SUCCESS",
     amount: { $gte: LIMITS.TO_BANK.cooldown.thresholdAmount },
   }).sort({ createdAt: -1 });
@@ -140,7 +136,8 @@ if (amount >= LIMITS.TO_BANK.cooldown.thresholdAmount) {
 if (isDev) {
    console.log("👛 STEP 5: Fetching wallet for userId =", userId);
 }
-    // 2️⃣ Fetch wallet
+
+ // 2️⃣ Fetch wallet
     const wallet = await Wallet.findOne({ userId }).select('+internalNuban').session(session);
 
     if (!wallet) {
@@ -150,18 +147,80 @@ if (isDev) {
     console.log("👛 STEP 5 RESULT: wallet =", wallet);
     }
 
+
+
+console.log("DEBUG userId:", userId);
+
+if (!planId) {
+  await session.abortTransaction();
+  session.endSession();
+  return res.status(400).json({
+    message: "planId is required",
+  });
+}
+
+const plan = await Plan.findOne({
+  _id: planId,
+  userId,
+}).session(session);
+
+if (!plan) {
+  await session.abortTransaction();
+  session.endSession();
+  return res.status(404).json({
+    message: "Savings plan not found or does not belong to user",
+  });
+}
+
+
+if (isDev) {
+  console.log("✅ RESOLVED PLAN:", {
+    planId,
+    status: plan.status,
+    balance: plan.balance,
+  });
+}
+    if (isDev) {
+    console.log("👛 STEP 5 RESULT: plan =", plan);
+    }
+
+
+
+    if (plan.status === "terminated") {
+  return res.status(410).json({
+    message: "This savings plan has already been terminated"
+  });
+}
+
     // 3️⃣ Balance check
-    if (wallet.balance < totalDebit) {
+    if (plan.balance < totalDebit) {
       return res.status(400).json({ message: `Insufficient balance. You need ₦${totalDebit}` });
     }
 
 
-    const toBankTxn = await ToBankTransaction.create(
+try {
+    const existing = await ToBankTransaction.findOne({
+  planId,
+  status: "PENDING",
+   }).session(session);
+
+    if (existing) {
+  return res.status(400).json({
+    message: "You have a pending transfer. Please wait.",
+  });
+ }
+ if (isDev) {
+ console.log("📌 STEP 3 RESULT: existing =", existing);
+ }
+
+
+    const earlyWihtdrawTxn = await ToBankTransaction.create(
   [{
     userId,
-    walletId: wallet._id,          // 🔥 REQUIRED
+    planId: plan._id,
+    walletId: wallet._id,
     amount,
-    fee,
+    penalty,
     totalDebit,
     bankName,
     bankCode,
@@ -172,6 +231,7 @@ if (isDev) {
   }],
   { session }
 );
+
 
 if (isDev) {
 console.log("🔥 RECIPIENT PAYLOAD", {
@@ -199,6 +259,26 @@ if (!recipientCode) {
   reason: narration,
 });
 
+// 🔐 MOCK PAYSTACK RESPONSE (ONLY HERE)
+if (process.env.MOCK_PAYSTACK === "true") {
+  // Simulate Paystack asking for OTP
+  earlyWihtdrawTxn.status = "OTP_REQUIRED";
+  earlyWihtdrawTxn.transferCode = "MOCK_TRANSFER_CODE";
+  earlyWihtdrawTxn.otpRequestedAt = new Date();
+
+  await earlyWihtdrawTxn.save({ session });
+
+  if (isDev) {
+    console.log("🧪 MOCK PAYSTACK → OTP_REQUIRED");
+  }
+
+  return res.json({
+    success: true,
+    status: "OTP_REQUIRED",
+    reference,
+  });
+}
+
 
   if (isDev) {
 console.log("📒 STEP 6: Creating ActivityLog...");
@@ -207,15 +287,16 @@ console.log("📒 STEP 6: Creating ActivityLog...");
   [
     {
       userId,
+      planId: plan._id,
       actorId: userId, // ✅ FIX
       walletId: wallet._id,
 
-      category: "TRANSFER",
-      channel: "BANK_TRANSFER",
-      type: "TO_BANK",
+      category: "PLAN",
+      channel: "EARLY_WITHDRAW",
+      type: "EARLY_WITHDRAW",
 
-      title: "Transfer to Bank",
-      description: `Sending ₦${amount} to ${accountName}`,
+      title: "Early Withdrawal",
+      description: `Early withdrawal of ₦${amount} with penalty`,
 
       amount,
       reference,
@@ -245,24 +326,25 @@ await Transaction.create(
   [
     {
       userId,
+      planId: plan._id,
       actorId: userId,
       walletId: wallet._id,
 
-      type: "TO_BANK",
-      category: "TRANSFER",
-      channel: "BANK_TRANSFER",
+      type: "EARLY_WITHDRAW",
+      category: "PLAN",
+      channel: "EARLY_WITHDRAW",
 
       direction: "DEBIT",
 
       amount,
-      fee: fee || 0,
-      netAmount: amount - (fee || 0),
+      penalty,
+      netAmount: amount - penalty,
 
       status: "PENDING",
       reference,
 
       title: "Transfer to Bank",
-      description: `Sending ₦${amount} to ${accountName}`,
+      description: `Early withdrawal of ₦${amount} with penalty`,
 
       counterpartyName: accountName,
 
@@ -326,8 +408,8 @@ if (init.requiresOtp) {
         narration,
         amount,
         status: "PENDING",
-        createdAt: toBankTxn.createdAt,
-        updatedAt: toBankTxn.updatedAt,
+        createdAt: earlyWihtdrawTxn.createdAt,
+        updatedAt: earlyWihtdrawTxn.updatedAt,
       },
     });
    } catch (error) {
@@ -344,7 +426,7 @@ if (init.requiresOtp) {
   session.endSession();
 
   if (isDev) {
-  console.error("TO BANK ERROR:", error);
+  console.error("EARLY WITHDRAW ERROR:", error);
   }
 
 
@@ -358,35 +440,41 @@ if (init.requiresOtp) {
 
 
 
-export const completeToBankTransfer = async (req, res) => {
+export const completeEarlyWithdraw = async (req, res) => {
   const { reference } = req.body;
 
   const session = await mongoose.startSession();
   session.startTransaction();
     if (isDev) {
-  console.log("[COMPLETE_TO_BANK] START", { reference });
+  console.log("[COMPLETE_EARLY_WITHDRAW] START", { reference });
     }
   try {
     
-    const tx = await ToBankTransaction.findOne({ reference }).session(session);
+    const ew = await ToBankTransaction.findOne({ reference }).session(session);
     if (isDev) {
-    console.log("[COMPLETE_TO_BANK] TX FOUND", {
-  id: tx?._id,
-  status: tx?.status,
-  amount: tx?.amount,
-  fee: tx?.fee,
-  walletId: tx?.walletId,
+    console.log("[COMPLETE_EARLY_WITHDRAW] EW FOUND", {
+  id: ew?._id,
+  status: ew?.status,
+  amount: ew?.amount,
+  penalty: ew?.penalty,
+  walletId: ew?.walletId,
 });
 }
+          const wallet = await Wallet.findById(ew.walletId)
+              .select("balance internalNuban accountNumber")
+              .session(session);
+        
+            if (!wallet) {
+              throw new Error("Wallet not found");
+            }
 
-
-    if (!tx) {
+    if (!ew) {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({ message: "Transaction not found" });
     }
 
-     if (tx.status !== "OTP_VERIFIED") {
+     if (ew.status !== "OTP_VERIFIED") {
   await session.abortTransaction();
   session.endSession();
   return res.status(400).json({
@@ -394,9 +482,9 @@ export const completeToBankTransfer = async (req, res) => {
   });
 }
      if (isDev) {
-    console.log("[COMPLETE_TO_BANK] STATUS CHECK PASSED", tx.status);
+    console.log("[COMPLETE_EARLY_WITHDRAW] STATUS CHECK PASSED", ew.status);
      }
-   if (!["OTP_VERIFIED", "PENDING"].includes(tx.status)) {
+   if (!["OTP_VERIFIED", "PENDING"].includes(ew.status)) {
   await session.abortTransaction();
   session.endSession();
   return res.status(400).json({
@@ -405,129 +493,109 @@ export const completeToBankTransfer = async (req, res) => {
 }
 
 
-    const wallet = await Wallet.findById(tx.walletId)
-      .select("balance internalNuban accountNumber")
-      .session(session);
+    const plan = await Plan.findById(ew.planId).session(session);
 
-    if (!wallet) {
-      throw new Error("Wallet not found");
-    }
+    if (!plan) {
+       throw new Error("Plan not found");
+      }
    if (isDev) {
-    console.log("[COMPLETE_TO_BANK] WALLET FOUND", {
-  walletId: wallet?._id,
-  balance: wallet?.balance,
-  internalNuban: wallet?.internalNuban,
+    console.log("[COMPLETE_EARLY_WITHDRAW] WALLET FOUND", {
+  planId: plan?._id,
+  balance: plan?.balance,
 });
    }
 
     
-    const balanceBefore = wallet.balance;
-    const fee = tx.fee || 0;
-    const totalDebit = tx.amount + fee;
+    const balanceBefore = plan.balance;
+    const penalty = ew.penalty || 0;
+    const totalDebit = ew.amount + penalty;
 
-    if (wallet.balance < totalDebit) {
+    if (plan.balance < totalDebit) {
       throw new Error("Insufficient balance");
     }
 
     
-    wallet.balance -= totalDebit;
+    plan.balance -= totalDebit;
     if (isDev) {
-    console.log("[COMPLETE_TO_BANK] DEBIT CALC", {
+    console.log("[COMPLETE_EARLY_WITHDRAW] DEBIT CALC", {
   balanceBefore,
-  amount: tx.amount,
-  fee,
+  amount: ew.amount,
+  penalty,
   totalDebit,
 });
     }
-    await wallet.save({ session });
+    await plan.save({ session });
+
+    if (plan.balance <= 0) {
+  plan.status = "completed";
+  plan.withdrawLocked = false;
+  await plan.save({ session });
+}
+
     if (isDev) {
-    console.log("[COMPLETE_TO_BANK] WALLET DEBITED", {
-  balanceAfter: wallet.balance,
+    console.log("[COMPLETE_EARLY_WITHDRAW] WALLET DEBITED", {
+  balanceAfter: plan.balance,
 });
     }
 
-    const balanceAfter = wallet.balance;
+    const balanceAfter = plan.balance;
 
    await Ledger.create(
   [
     {
-      userId: tx.userId,
+      userId: ew.userId,
       walletId: wallet._id,
-      internalNuban: wallet.internalNuban,
-      accountNumber: wallet.accountNumber,
+      planId: plan._id,
       type: "DEBIT",
-      source: "TO_BANK",
-      amount: tx.amount,
+      source: "PLAN_EARLY_WITHDRAW",
+      amount: ew.amount,
       balanceBefore,
       balanceAfter,
-      narration: tx.narration,
+      narration: ew.narration,
       reference,
     }
   ],
   { session }
 );
 
-    
-    if (fee > 0) {
-      if (isDev) {
-    console.log("[COMPLETE_TO_BANK] FEE PROCESSED", { fee });
-      }
-      await Ledger.create(
-      [
-         {
-          userId: tx.userId,
-          walletId: wallet._id,
-          internalNuban: wallet.internalNuban,
-          type: "DEBIT",
-          source: "TO_BANK_FEE",
-          amount: fee,
-          balanceBefore: balanceAfter,
-          balanceAfter: balanceAfter,
-          narration: "Transfer service fee",
-          reference,
-        },
-      ],
-        { session }
-      );
 
-      
-      await addPlatformFee(
-        {
-          source: "TO_BANK",
-          amount: fee,
-          reference,
-          userId: tx.userId,
-          narration: "To Bank transfer service fee",
-          direction: "CREDIT",
-          createdAt: new Date(),
-        },
-        session
-      );
-    }
-   await PlatformLedger.create(
-  [
-    {
-      reference,
-      source: "TO_BANK",
-      type: "PLATFORM_FEE",
-      direction: "CREDIT",
-      amount: fee,
-      narration: "To Bank transfer service fee",
-      meta: {
-        userId: tx.userId,
-      },
-    },
-  ],
-  { session }
-);
- 
-    
-    tx.status = "SUCCESS";
+     await addPlatformFee(
+           {
+             source: "EARLY_WITHDRAW",
+             amount: penalty,
+             reference,
+             userId: ew.userId,
+             narration: "Early withdrawal penalty",
+             direction: "CREDIT",
+             createdAt: new Date(),
+           },
+           session
+         );
+
+      await PlatformLedger.create(
+     [
+       {
+         reference,
+         source: "EARLY_WITHDRAW",
+         type: "PENALTY",
+         direction: "CREDIT",
+         amount: penalty,
+         narration: "Early withdrawal penalty",
+         meta: {
+           userId: ew.userId,
+         },
+       },
+     ],
+     { session }
+   );
+
+
+    ew.status = "SUCCESS";
     if (isDev) {
-    console.log("[COMPLETE_TO_BANK] SETTING TX SUCCESS");
+    console.log("[COMPLETE_EARLY_WITHDRAW] SETTING EW SUCCESS");
     }
-    tx.completedAt = new Date();
-    await tx.save({ session });
+    ew.completedAt = new Date();
+    await ew.save({ session });
 
 
     await ActivityLog.findOneAndUpdate(
@@ -538,14 +606,14 @@ export const completeToBankTransfer = async (req, res) => {
 
  
     await Transaction.findOneAndUpdate(
-      { reference, status: "PENDING", type: "TO_BANK" },
+      { reference, status: "PENDING", type: "EARLY_WITHDRAW" },
       { status: "SUCCESS", completedAt: new Date() },
       { session }
     );
 
     await session.commitTransaction();
     if (isDev) {
-    console.log("[COMPLETE_TO_BANK] COMMITTING TRANSACTION");
+    console.log("[COMPLETE_EARLY_WITHDRAW] COMMITTING TRANSACTION");
           }
     session.endSession();
 
@@ -558,7 +626,7 @@ export const completeToBankTransfer = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
      if (isDev) {
-    console.error("COMPLETE TO BANK ERROR:", error);
+    console.error("COMPLETE EARLY_WITHDRAW ERROR:", error);
      }
      
 
@@ -570,32 +638,42 @@ export const completeToBankTransfer = async (req, res) => {
 
 
 
-export const failToBankTransfer = async (req, res) => {
+export const failEarlyWithdraw = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const { reference, reason = "Bank transfer failed" } = req.body;
 
-    const tx = await ToBankTransaction
+    const ew = await ToBankTransaction
       .findOne({ reference })
       .session(session);
 
-    if (!tx) {
+    if (!ew) {
       return res.status(404).json({ message: "Transaction not found" });
     }
 
-    if (tx.status !== "PENDING") {
+    if (ew.status !== "PENDING") {
       return res.status(400).json({
         message: "Transaction already resolved",
       });
     }
+     
+    const plan = await Plan.findById(ew.planId).session(session);
+
+    if (!plan) {
+     throw new Error("Plan not found");
+     }
+
+   // unlock plan because transfer failed
+    plan.withdrawLocked = false;
+    await plan.save({ session });
 
     // Mark failed
-    tx.status = "FAILED";
-    tx.failedAt = new Date();
-    tx.failureReason = reason;
-    await tx.save({ session });
+    ew.status = "FAILED";
+    ew.failedAt = new Date();
+    ew.failureReason = reason;
+    await ew.save({ session });
 
     await ActivityLog.findOneAndUpdate(
       { reference },
@@ -635,9 +713,8 @@ export const failToBankTransfer = async (req, res) => {
 };
 
 
+export const verifyEarlyWithdrawOtp = async (req, res) => {
 
-
-export const verifyToBankOtp = async (req, res) => {
   const { reference, otp } = req.body;
 
   if (!reference || !otp) {
@@ -648,27 +725,50 @@ export const verifyToBankOtp = async (req, res) => {
 
   try {
     // 1️⃣ Find transaction
-    const tx = await ToBankTransaction.findOne({ reference });
+    const ew = await ToBankTransaction.findOne({ reference });
 
-    if (!tx) {
+    if (!ew) {
       return res.status(404).json({
         message: "Transaction not found",
       });
     }
 
     // 2️⃣ Guard: must be waiting for OTP
-    if (tx.status !== "OTP_REQUIRED") {
+    if (ew.status !== "OTP_REQUIRED") {
       return res.status(400).json({
         message: "Transaction not awaiting OTP",
       });
     }
 
-    if (!tx.transferCode) {
+      if (process.env.MOCK_PAYSTACK_OTP === "true") {
+  // Optional: enforce mock OTP value
+  if (otp !== "123456") {
+    return res.status(400).json({
+      message: "Invalid mock OTP",
+    });
+  }
+
+  // ✅ Simulate Paystack success
+  ew.status = "SUCCESS";
+  ew.otpVerifiedAt = new Date();
+  ew.completedAt = new Date();
+  await ew.save();
+
+  return res.json({
+    success: true,
+    message: "Transfer completed (mocked)",
+    reference,
+    status: "SUCCESS",
+  });
+}
+
+    if (!ew.transferCode) {
       return res.status(400).json({
         message: "Missing transfer code",
       });
     }
 
+    
     // 3️⃣ Call Paystack to finalize transfer
     const response = await paystackRequest(
       "/transfer/finalize_transfer",
@@ -679,6 +779,7 @@ export const verifyToBankOtp = async (req, res) => {
       }
     );
 
+
     if (!response?.data?.status) {
       return res.status(400).json({
         message: "OTP verification failed",
@@ -686,9 +787,9 @@ export const verifyToBankOtp = async (req, res) => {
     }
 
     // 4️⃣ Mark OTP verified
-    tx.status = "OTP_VERIFIED";
-    tx.otpVerifiedAt = new Date();
-    await tx.save();
+    ew.status = "OTP_VERIFIED";
+    ew.otpVerifiedAt = new Date();
+    await ew.save();
 
     return res.json({
       success: true,
@@ -708,7 +809,7 @@ export const verifyToBankOtp = async (req, res) => {
 };
 
 
-export const toBankStatus = async (req, res) => {
+export const earlyWithdrawStatus = async (req, res) => {
   try {
     const { reference } = req.query;
 
@@ -719,9 +820,9 @@ export const toBankStatus = async (req, res) => {
       });
     }
 
-    const txn = await ToBankTransaction.findOne({ reference });
+    const ew = await ToBankTransaction.findOne({ reference });
 
-    if (!txn) {
+    if (!ew ) {
       return res.status(404).json({
         success: false,
         message: "Transaction not found",
@@ -730,12 +831,12 @@ export const toBankStatus = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      status: txn.status, // PENDING | PROCESSING | SUCCESS | FAILED
-      requiresOtp: txn.status === "OTP_REQUIRED",
+      status: ew.status, // PENDING | PROCESSING | SUCCESS | FAILED
+      requiresOtp: ew.status === "OTP_REQUIRED",
     });
   } catch (err) {
     if (isDev) {
-    console.error("TO BANK STATUS ERROR:", err);
+    console.error("EARLY WITHDRAW STATUS ERROR:", err);
     }
     return res.status(500).json({
       success: false,

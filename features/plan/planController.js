@@ -2,7 +2,7 @@ import Plan from "../models/Plan.js";
 
 export const createPlan = async (req, res) => {
   try {
-    const { amount, frequency, duration, startDate } = req.body;
+    const { amount, frequency, duration, startDate, narration } = req.body;
 
     // ✅ Validate inputs
     if (!amount || !frequency || !duration || !startDate) {
@@ -44,6 +44,13 @@ export const createPlan = async (req, res) => {
     if (frequency === "monthly") {
       endDate.setMonth(endDate.getMonth() + Number(duration));
     }
+     const amt = Number(amount);
+    // calculate real number of days
+   const diffMs = endDate.getTime() - start.getTime();
+   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+// final total target
+const totalTarget = amt * diffDays;
 
     // ✅ Generate human title
     const title = `₦${amount} ${frequency} savings for ${duration} ${
@@ -63,10 +70,12 @@ export const createPlan = async (req, res) => {
       title,
       amount,
       frequency,
+      narration,
       duration,
       startDate: start,
       endDate,
       reference,
+      totalTarget,
       status: "active",
     });
 
@@ -115,3 +124,4 @@ export const getMyPlans = async (req, res) => {
     });
   }
 };
+

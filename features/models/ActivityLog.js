@@ -10,6 +10,12 @@ const activityLogSchema = new mongoose.Schema(
       index: true,
     },
 
+    planId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Plan",
+      index: true,
+    },
+
     actorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -34,7 +40,8 @@ const activityLogSchema = new mongoose.Schema(
       enum: [
         "DEPOSIT",          // money entered wallet
         "TRANSFER",         // money moved out
-        "A2A",              // wallet-to-wallet
+        "A2A", 
+        "PLAN" 
       ],
       required: true,
       index: true,
@@ -50,6 +57,7 @@ const activityLogSchema = new mongoose.Schema(
         "USSD",
         "BANK_TRANSFER",
         "A2A",
+        "EARLY_WITHDRAW"
       ],
       required: true,
       index: true,
@@ -64,6 +72,7 @@ const activityLogSchema = new mongoose.Schema(
         "DEPOSIT",
         "TO_BANK",
         "A2A",
+        "EARLY_WITHDRAW"
       ],
       required: true,
       index: true,

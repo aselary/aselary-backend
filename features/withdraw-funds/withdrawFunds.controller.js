@@ -14,12 +14,18 @@ import { createTransferRecipient } from "../transfer/createRecipient.js";
 import { initiatePaystackTransfer } from "../transfer/initiateTransfer.js";
 import isDev from "../utils/isDev.js";
 import { paystackRequest }from "../utils/paystack.js";
+import Plan from "../models/Plan.js";
 
-export const toBankTransfer = async (req, res) => {
+export const withdrawFunds = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     const userId = req.user.id;
+    const { planId } = req.body;
+
+    console.log("🟡 RAW req.body:", req.body);
+    console.log("🟡 planId from body:", planId);
+    console.log("🟡 typeof planId:", typeof planId);
     const {
       amount,
       bankName,
@@ -61,20 +67,6 @@ export const toBankTransfer = async (req, res) => {
    console.log("🔖 STEP 2: REFERENCE =", reference);
 console.log("🔍 STEP 3: Checking pending transaction...");
    }
-  try {
-    const existing = await ToBankTransaction.findOne({
-  userId,
-  status: "PENDING",
-   }).session(session);
-
-    if (existing) {
-  return res.status(400).json({
-    message: "You have a pending transfer. Please wait.",
-  });
- }
- if (isDev) {
- console.log("📌 STEP 3 RESULT: existing =", existing);
- }
 
     const fee = calculateFee(amount, TO_BANK_FEES);
     const totalDebit = amount + fee;
@@ -85,17 +77,17 @@ console.log("🔍 STEP 3: Checking pending transaction...");
 // 1️⃣ Per-transaction limit
 if (amount > LIMITS.TO_BANK.maxPerTransaction) {
   return res.status(400).json({
-    message: `To Bank limit is ₦${LIMITS.TO_BANK.maxPerTransaction.toLocaleString()} per transaction`,
+    message: `Withdraw Fnds limit is ₦${LIMITS.TO_BANK.maxPerTransaction.toLocaleString()} per transaction`,
   });
 }
    const dailyTotal = await getDailyTransferTotal({
   userId,
-  type: "TO_BANK",
+  type: "WITHDRAW_FUND",
 });
 
 if (dailyTotal + amount > LIMITS.TO_BANK.maxDailyTotal) {
   return res.status(403).json({
-    message: `Daily to-bank limit is ₦${LIMITS.TO_BANK.maxDailyTotal.toLocaleString()}`,
+    message: `Daily withdraw-fund limit is ₦${LIMITS.TO_BANK.maxDailyTotal.toLocaleString()}`,
   });
 }
 
@@ -104,7 +96,7 @@ startOfDay.setHours(0, 0, 0, 0);
 
 const sameBankCount = await Transaction.countDocuments({
   userId,
-  type: "TO_BANK",
+  type: "WITHDRAW_FUND",
   status: "SUCCESS",
   bankCode,
   accountNumber,
@@ -120,7 +112,7 @@ if (sameBankCount >= LIMITS.TO_BANK.maxSameBankPerDay) {
 if (amount >= LIMITS.TO_BANK.cooldown.thresholdAmount) {
   const lastBigTransfer = await Transaction.findOne({
     userId,
-    type: "TO_BANK",
+    type: "WITHDRAW_FUND",
     status: "SUCCESS",
     amount: { $gte: LIMITS.TO_BANK.cooldown.thresholdAmount },
   }).sort({ createdAt: -1 });
@@ -150,16 +142,76 @@ if (isDev) {
     console.log("👛 STEP 5 RESULT: wallet =", wallet);
     }
 
+  console.log("DEBUG userId:", userId);
+
+if (!planId) {
+  await session.abortTransaction();
+  session.endSession();
+  return res.status(400).json({
+    message: "planId is required",
+  });
+}
+
+const plan = await Plan.findOne({
+  _id: planId,
+  userId,
+}).session(session);
+
+if (!plan) {
+  await session.abortTransaction();
+  session.endSession();
+  return res.status(404).json({
+    message: "Savings plan not found or does not belong to user",
+  });
+}
+
+
+if (isDev) {
+  console.log("✅ RESOLVED PLAN:", {
+    planId,
+    status: plan.status,
+    balance: plan.balance,
+  });
+}
+    if (isDev) {
+    console.log("👛 STEP 5 RESULT: plan =", plan);
+    }
+
+
+
+    if (plan.status === "completed") {
+  return res.status(410).json({
+    message: "This savings plan has already been completed"
+  });
+}
+
     // 3️⃣ Balance check
-    if (wallet.balance < totalDebit) {
+    if (plan.balance < totalDebit) {
       return res.status(400).json({ message: `Insufficient balance. You need ₦${totalDebit}` });
     }
 
 
-    const toBankTxn = await ToBankTransaction.create(
+try {
+    const existing = await ToBankTransaction.findOne({
+  planId,
+  status: "PENDING",
+   }).session(session);
+
+    if (existing) {
+  return res.status(400).json({
+    message: "You have a pending transfer. Please wait.",
+  });
+ }
+ if (isDev) {
+ console.log("📌 STEP 3 RESULT: existing =", existing);
+ }
+
+
+    const withdrawFundTxn = await ToBankTransaction.create(
   [{
     userId,
-    walletId: wallet._id,          // 🔥 REQUIRED
+    walletId: wallet._id,    
+    planId: plan._id,      // 🔥 REQUIRED
     amount,
     fee,
     totalDebit,
@@ -199,6 +251,26 @@ if (!recipientCode) {
   reason: narration,
 });
 
+  // 🔐 MOCK PAYSTACK RESPONSE (ONLY HERE)
+  if (process.env.MOCK_PAYSTACK === "true") {
+    // Simulate Paystack asking for OTP
+    withdrawFundTxn.status = "OTP_REQUIRED";
+    withdrawFundTxn.transferCode = "MOCK_TRANSFER_CODE";
+    withdrawFundTxn.otpRequestedAt = new Date();
+  
+    await withdrawFundTxn.save({ session });
+  
+    if (isDev) {
+      console.log("🧪 MOCK PAYSTACK → OTP_REQUIRED");
+    }
+  
+    return res.json({
+      success: true,
+      status: "OTP_REQUIRED",
+      reference,
+    });
+  }
+
 
   if (isDev) {
 console.log("📒 STEP 6: Creating ActivityLog...");
@@ -208,11 +280,12 @@ console.log("📒 STEP 6: Creating ActivityLog...");
     {
       userId,
       actorId: userId, // ✅ FIX
+      planId: plan._id,
       walletId: wallet._id,
 
-      category: "TRANSFER",
-      channel: "BANK_TRANSFER",
-      type: "TO_BANK",
+      category: "PLAN",
+      channel: "WITHDRAW_FUND",
+      type: "WITHDRAW_FUND",
 
       title: "Transfer to Bank",
       description: `Sending ₦${amount} to ${accountName}`,
@@ -247,10 +320,11 @@ await Transaction.create(
       userId,
       actorId: userId,
       walletId: wallet._id,
+      planId: plan._id,
 
-      type: "TO_BANK",
-      category: "TRANSFER",
-      channel: "BANK_TRANSFER",
+      type: "WITHDRAW_FUND",
+      category: "PLAN",
+      channel: "WITHDRAW_FUND",
 
       direction: "DEBIT",
 
@@ -275,7 +349,7 @@ await Transaction.create(
         narration,
       },
 
-      source: "TO_BANK",
+      source: "WITHDRAW_FUND",
       createdAt: new Date(),
     },
   ],
@@ -326,14 +400,14 @@ if (init.requiresOtp) {
         narration,
         amount,
         status: "PENDING",
-        createdAt: toBankTxn.createdAt,
-        updatedAt: toBankTxn.updatedAt,
+        createdAt: withdrawFundTxn.createdAt,
+        updatedAt: withdrawFundTxn.updatedAt,
       },
     });
    } catch (error) {
 
    if (isDev) {
-     console.error("🔥 TO BANK CRASHED");
+     console.error("🔥 WITHDRAW_FUND CRASHED");
   console.error("❌ MESSAGE:", error?.message);
   console.error("❌ STACK:", error?.stack);
    }
@@ -344,7 +418,7 @@ if (init.requiresOtp) {
   session.endSession();
 
   if (isDev) {
-  console.error("TO BANK ERROR:", error);
+  console.error("WITHDRAW_FUND ERROR:", error);
   }
 
 
@@ -358,35 +432,35 @@ if (init.requiresOtp) {
 
 
 
-export const completeToBankTransfer = async (req, res) => {
+export const completeWithdrawFund = async (req, res) => {
   const { reference } = req.body;
 
   const session = await mongoose.startSession();
   session.startTransaction();
     if (isDev) {
-  console.log("[COMPLETE_TO_BANK] START", { reference });
+  console.log("[COMPLETE_WITHDRAW_FUND] START", { reference });
     }
   try {
     
-    const tx = await ToBankTransaction.findOne({ reference }).session(session);
+    const wf = await ToBankTransaction.findOne({ reference }).session(session);
     if (isDev) {
-    console.log("[COMPLETE_TO_BANK] TX FOUND", {
-  id: tx?._id,
-  status: tx?.status,
-  amount: tx?.amount,
-  fee: tx?.fee,
-  walletId: tx?.walletId,
+    console.log("[COMPLETE_WITHDRAW_FUND] WF FOUND", {
+  id: wf?._id,
+  status: wf?.status,
+  amount: wf?.amount,
+  fee: wf?.fee,
+  walletId: wf?.walletId,
 });
 }
 
 
-    if (!tx) {
+    if (!wf) {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({ message: "Transaction not found" });
     }
 
-     if (tx.status !== "OTP_VERIFIED") {
+     if (wf.status !== "OTP_VERIFIED") {
   await session.abortTransaction();
   session.endSession();
   return res.status(400).json({
@@ -394,9 +468,9 @@ export const completeToBankTransfer = async (req, res) => {
   });
 }
      if (isDev) {
-    console.log("[COMPLETE_TO_BANK] STATUS CHECK PASSED", tx.status);
+    console.log("[COMPLETE_WITHDRAW_FUND] STATUS CHECK PASSED", wf.status);
      }
-   if (!["OTP_VERIFIED", "PENDING"].includes(tx.status)) {
+   if (!["OTP_VERIFIED", "PENDING"].includes(wf.status)) {
   await session.abortTransaction();
   session.endSession();
   return res.status(400).json({
@@ -405,62 +479,71 @@ export const completeToBankTransfer = async (req, res) => {
 }
 
 
-    const wallet = await Wallet.findById(tx.walletId)
+    const wallet = await Wallet.findById(wf.walletId)
       .select("balance internalNuban accountNumber")
       .session(session);
 
-    if (!wallet) {
-      throw new Error("Wallet not found");
-    }
+     const plan = await Plan.findById(wf.planId).session(session);
+
+    if (!plan) {
+       throw new Error("Plan not found");
+      }
    if (isDev) {
-    console.log("[COMPLETE_TO_BANK] WALLET FOUND", {
-  walletId: wallet?._id,
-  balance: wallet?.balance,
-  internalNuban: wallet?.internalNuban,
+    console.log("[COMPLETE_EARLY_WITHDRAW] WALLET FOUND", {
+  planId: plan?._id,
+  balance: plan?.balance,
 });
    }
 
     
     const balanceBefore = wallet.balance;
-    const fee = tx.fee || 0;
-    const totalDebit = tx.amount + fee;
+    const fee = wf.fee || 0;
+    const totalDebit = wf.amount + fee;
 
-    if (wallet.balance < totalDebit) {
+    if (plan.balance < totalDebit) {
       throw new Error("Insufficient balance");
     }
 
     
-    wallet.balance -= totalDebit;
+    plan.balance -= totalDebit;
     if (isDev) {
-    console.log("[COMPLETE_TO_BANK] DEBIT CALC", {
+    console.log("[COMPLETE_WITHDRAW_FUND] DEBIT CALC", {
   balanceBefore,
-  amount: tx.amount,
+  amount: wf.amount,
   fee,
   totalDebit,
 });
     }
-    await wallet.save({ session });
+     await plan.save({ session });
+
+    if (plan.balance <= 0) {
+  plan.status = "completed";
+  plan.withdrawLocked = false;
+  await plan.save({ session });
+}
+
     if (isDev) {
-    console.log("[COMPLETE_TO_BANK] WALLET DEBITED", {
-  balanceAfter: wallet.balance,
+    console.log("[COMPLETE_EARLY_WITHDRAW] WALLET DEBITED", {
+  balanceAfter: plan.balance,
 });
     }
 
-    const balanceAfter = wallet.balance;
+    const balanceAfter = plan.balance;
 
    await Ledger.create(
   [
     {
-      userId: tx.userId,
+      userId: wf.userId,
       walletId: wallet._id,
+      planId: plan._id,
       internalNuban: wallet.internalNuban,
       accountNumber: wallet.accountNumber,
       type: "DEBIT",
-      source: "TO_BANK",
-      amount: tx.amount,
+      source: "PLAN_WITHDRAW_FUND",
+      amount: wf.amount,
       balanceBefore,
       balanceAfter,
-      narration: tx.narration,
+      narration: wf.narration,
       reference,
     }
   ],
@@ -470,16 +553,17 @@ export const completeToBankTransfer = async (req, res) => {
     
     if (fee > 0) {
       if (isDev) {
-    console.log("[COMPLETE_TO_BANK] FEE PROCESSED", { fee });
+    console.log("[COMPLETE_WITHDRAW_FUND FEE PROCESSED", { fee });
       }
       await Ledger.create(
       [
          {
-          userId: tx.userId,
+          userId: wf.userId,
+          planId: plan._id,
           walletId: wallet._id,
           internalNuban: wallet.internalNuban,
           type: "DEBIT",
-          source: "TO_BANK_FEE",
+          source: "PLAN_WITHDRAW_FUND",
           amount: fee,
           balanceBefore: balanceAfter,
           balanceAfter: balanceAfter,
@@ -493,11 +577,11 @@ export const completeToBankTransfer = async (req, res) => {
       
       await addPlatformFee(
         {
-          source: "TO_BANK",
+          source: "WITHDRAW_FUND",
           amount: fee,
           reference,
-          userId: tx.userId,
-          narration: "To Bank transfer service fee",
+          userId: wf.userId,
+          narration: "Withdrawal funds fee",
           direction: "CREDIT",
           createdAt: new Date(),
         },
@@ -508,13 +592,13 @@ export const completeToBankTransfer = async (req, res) => {
   [
     {
       reference,
-      source: "TO_BANK",
-      type: "PLATFORM_FEE",
+      source: "WITHDRAW_FUND",
+      type: "WITHDRAW_FEE",
       direction: "CREDIT",
       amount: fee,
-      narration: "To Bank transfer service fee",
+      narration: "Withdrawal funds fee",
       meta: {
-        userId: tx.userId,
+        userId: wf.userId,
       },
     },
   ],
@@ -522,12 +606,12 @@ export const completeToBankTransfer = async (req, res) => {
 );
  
     
-    tx.status = "SUCCESS";
-    if (isDev) {
-    console.log("[COMPLETE_TO_BANK] SETTING TX SUCCESS");
+    wf.status = "SUCCESS";
+    if (isDev) { 
+    console.log("[COMPLETE_WITHDRAW_FUND] SETTING WF SUCCESS");
     }
-    tx.completedAt = new Date();
-    await tx.save({ session });
+    wf.completedAt = new Date();
+    await wf.save({ session });
 
 
     await ActivityLog.findOneAndUpdate(
@@ -538,27 +622,27 @@ export const completeToBankTransfer = async (req, res) => {
 
  
     await Transaction.findOneAndUpdate(
-      { reference, status: "PENDING", type: "TO_BANK" },
+      { reference, status: "PENDING", type: "WITHDRAW_FUND" },
       { status: "SUCCESS", completedAt: new Date() },
       { session }
     );
 
     await session.commitTransaction();
     if (isDev) {
-    console.log("[COMPLETE_TO_BANK] COMMITTING TRANSACTION");
+    console.log("[COMPLETE_WITHDRAW_FUND] COMMITTING TRANSACTION");
           }
     session.endSession();
 
     return res.json({
       success: true,
-      message: "Transfer settled successfully",
+      message: "Withdrawal settled successfully",
       reference,
     });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
      if (isDev) {
-    console.error("COMPLETE TO BANK ERROR:", error);
+    console.error("COMPLETE WITHDRAW FUND ERROR:", error);
      }
      
 
@@ -570,32 +654,32 @@ export const completeToBankTransfer = async (req, res) => {
 
 
 
-export const failToBankTransfer = async (req, res) => {
+export const failWithdrawFund = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const { reference, reason = "Bank transfer failed" } = req.body;
 
-    const tx = await ToBankTransaction
+    const wf = await ToBankTransaction
       .findOne({ reference })
       .session(session);
 
-    if (!tx) {
+    if (!wf) {
       return res.status(404).json({ message: "Transaction not found" });
     }
 
-    if (tx.status !== "PENDING") {
+    if (wf.status !== "PENDING") {
       return res.status(400).json({
         message: "Transaction already resolved",
       });
     }
 
     // Mark failed
-    tx.status = "FAILED";
-    tx.failedAt = new Date();
-    tx.failureReason = reason;
-    await tx.save({ session });
+    wf.status = "FAILED";
+    wf.failedAt = new Date();
+    wf.failureReason = reason;
+    await wf.save({ session });
 
     await ActivityLog.findOneAndUpdate(
       { reference },
@@ -637,7 +721,7 @@ export const failToBankTransfer = async (req, res) => {
 
 
 
-export const verifyToBankOtp = async (req, res) => {
+export const verifyWithdrawFundOtp = async (req, res) => {
   const { reference, otp } = req.body;
 
   if (!reference || !otp) {
@@ -648,22 +732,44 @@ export const verifyToBankOtp = async (req, res) => {
 
   try {
     // 1️⃣ Find transaction
-    const tx = await ToBankTransaction.findOne({ reference });
+    const wf = await ToBankTransaction.findOne({ reference });
 
-    if (!tx) {
+    if (!wf) {
       return res.status(404).json({
         message: "Transaction not found",
       });
     }
 
     // 2️⃣ Guard: must be waiting for OTP
-    if (tx.status !== "OTP_REQUIRED") {
+    if (wf.status !== "OTP_REQUIRED") {
       return res.status(400).json({
         message: "Transaction not awaiting OTP",
       });
     }
 
-    if (!tx.transferCode) {
+      if (process.env.MOCK_PAYSTACK_OTP === "true") {
+  // Optional: enforce mock OTP value
+  if (otp !== "123456") {
+    return res.status(400).json({
+      message: "Invalid mock OTP",
+    });
+  }
+
+  // ✅ Simulate Paystack success
+  wf.status = "SUCCESS";
+  wf.otpVerifiedAt = new Date();
+  wf.completedAt = new Date();
+  await wf.save();
+
+  return res.json({
+    success: true,
+    message: "Transfer completed (mocked)",
+    reference,
+    status: "SUCCESS",
+  });
+}
+
+    if (!wf.transferCode) {
       return res.status(400).json({
         message: "Missing transfer code",
       });
@@ -674,7 +780,7 @@ export const verifyToBankOtp = async (req, res) => {
       "/transfer/finalize_transfer",
       "POST",
       {
-        transfer_code: tx.transferCode,
+        transfer_code: wf.transferCode,
         otp,
       }
     );
@@ -684,11 +790,11 @@ export const verifyToBankOtp = async (req, res) => {
         message: "OTP verification failed",
       });
     }
-
+  
     // 4️⃣ Mark OTP verified
-    tx.status = "OTP_VERIFIED";
-    tx.otpVerifiedAt = new Date();
-    await tx.save();
+    wf.status = "OTP_VERIFIED";
+    wf.otpVerifiedAt = new Date();
+    await wf.save();
 
     return res.json({
       success: true,
@@ -708,7 +814,7 @@ export const verifyToBankOtp = async (req, res) => {
 };
 
 
-export const toBankStatus = async (req, res) => {
+export const WithdrawFundStatus = async (req, res) => {
   try {
     const { reference } = req.query;
 
@@ -719,9 +825,9 @@ export const toBankStatus = async (req, res) => {
       });
     }
 
-    const txn = await ToBankTransaction.findOne({ reference });
+    const wf = await ToBankTransaction.findOne({ reference });
 
-    if (!txn) {
+    if (!wf) {
       return res.status(404).json({
         success: false,
         message: "Transaction not found",
@@ -730,12 +836,12 @@ export const toBankStatus = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      status: txn.status, // PENDING | PROCESSING | SUCCESS | FAILED
-      requiresOtp: txn.status === "OTP_REQUIRED",
+      status: wf.status, // PENDING | PROCESSING | SUCCESS | FAILED
+      requiresOtp: wf.status === "OTP_REQUIRED",
     });
   } catch (err) {
     if (isDev) {
-    console.error("TO BANK STATUS ERROR:", err);
+    console.error("WITHDRAW FUND STATUS ERROR:", err);
     }
     return res.status(500).json({
       success: false,

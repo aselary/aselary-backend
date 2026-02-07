@@ -1,4 +1,5 @@
 import { paystackFetch } from "../services/paystack.js";
+import isDev from "../utils/isDev.js";
 
 
 export const createTransferRecipient = async ({
@@ -7,9 +8,18 @@ export const createTransferRecipient = async ({
   bankCode,
 }) => {
 
-    if (process.env.NODE_ENV !== "production") {
-  return "RCP_TEST_FAKE";
-}
+   // ✅ MOCK FOR DEV / LOCAL
+  if (isDev) {
+    return {
+      recipientCode: "RCP_TEST_FAKE_001",
+      name,
+      accountNumber,
+      bankCode,
+      currency: "NGN",
+      isMock: true,
+      createdAt: new Date().toISOString(),
+    };
+  }
 
   const response = await paystackFetch("/transferrecipient", {
     method: "POST",

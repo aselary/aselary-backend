@@ -39,6 +39,11 @@ const planSchema = new mongoose.Schema(
       required: true,
     },
 
+    totalTarget: {
+      type: Number,
+      required: true
+    },
+
     balance: { 
       type: Number, 
       default: 0 
@@ -49,9 +54,14 @@ const planSchema = new mongoose.Schema(
       default: true 
     },
 
+    narration: {
+      type: String,
+      default: ""
+    },
+
     status: {
       type: String,
-      enum: ["active", "completed"],
+      enum: ["active", "completed", "closing", "terminated"],
       default: "active",
     },
   },

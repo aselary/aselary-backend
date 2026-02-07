@@ -1,0 +1,35 @@
+import { calculateFee } from "../utils/calculateFee.js";
+import { WITHDRAW_FUND_FEES } from "../../config/savingsFee.js";
+import isDev from "../utils/isDev.js";
+
+export const previewWithdrawFunds = async (req, res) => {
+  try {
+    const { amount } = req.body;
+
+    if (!amount || amount <= 99) {
+      return res.status(400).json({
+        message: "Invalid amount"
+      });
+    }
+
+    const fee = calculateFee(amount, WITHDRAW_FUND_FEES);
+    const totalDebit = amount + fee;
+
+    return res.status(200).json({
+      amount,
+      fee,
+      totalDebit,
+      breakdown: {
+        transferAmount: amount,
+        serviceFee: fee
+      }
+    });
+  } catch (error) {
+    if (isDev) {
+    console.error(error);
+    }
+    return res.status(500).json({
+      message: "Failed to preview transfer"
+    });
+  }
+};

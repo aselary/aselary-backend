@@ -14,6 +14,13 @@ const transactionSchema = new mongoose.Schema(
           required: true,
           index: true,
         },
+
+            planId: {
+              type: mongoose.Schema.Types.ObjectId,
+              ref: "Plan",
+              required: true,
+              index: true,
+            },
     
         walletId: {
           type: mongoose.Schema.Types.ObjectId,
@@ -22,7 +29,7 @@ const transactionSchema = new mongoose.Schema(
           index: true,
         },
    
-        /**
+             /**
          * EXACT action (machine-level)
          */
         type: {
@@ -31,28 +38,26 @@ const transactionSchema = new mongoose.Schema(
             "DEPOSIT",
             "TO_BANK",
             "A2A",
+            "EARLY_WITHDRAW",
+            "WITHDRAW_FUND",
           ],
           required: true,
           index: true,
         },
-    
-
 
     amount: {
       type: Number,
       required: true,
     },
-
-
-
         category: {
           type: String,
           enum: [
-            "DEPOSIT",          // money entered wallet
-            "TRANSFER",         // money moved out
+            "DEPOSIT", 
+            "TRANSFER",
             "A2A",
             "CARD", 
-            "USSD",              // wallet-to-wallet
+            "USSD", 
+            "PLAN"
           ],
           required: true,
           index: true,
@@ -68,24 +73,13 @@ const transactionSchema = new mongoose.Schema(
             "USSD",
             "BANK_TRANSFER",
             "A2A",
+            "EARLY_WITHDRAW",
+            "WITHDRAW_FUND",
           ],
           required: true,
           index: true,
         },
     
-        /**
-         * EXACT action (machine-level)
-         */
-        type: {
-          type: String,
-          enum: [
-            "DEPOSIT",
-            "TO_BANK",
-            "A2A",
-          ],
-          required: true,
-          index: true,
-        },
 
         reference: {
           type: String,

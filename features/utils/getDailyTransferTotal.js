@@ -2,7 +2,7 @@ import Transaction from "../models/Transaction.js";
 
 export const getDailyTransferTotal = async ({
   userId,
-  type, // "A2A" or "TO_BANK"
+  type, 
 }) => {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);

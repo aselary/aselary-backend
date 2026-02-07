@@ -39,7 +39,6 @@ import { securityGuard } from "./features/middleware/securityGuard.js";
 import paystackRoutes from "./features/paystack/paystack.route.js";
 import ussdRoutes from "./features/ussd/ussd.route.js";
 import a2aTransferRoutes from "./features/A2A/a2aTransfer.route.js";
-import withdrawalRoutes from "./features/withdraw/withdrawal.routes.js";
 import bankRoutes from "./features/bank/bank.routes.js";
 import activityLogRoutes from "./features/activity-log/activityLog.routes.js";
 import { expirePendingTransactions } from "./src/jobs/expirePendingTransactions.js";
@@ -48,6 +47,8 @@ import profileRoutes from "./features/profile/profile.route.js";
 import resetSignupRoutes from "./features/resetSignup/resetSignup.route.js";
 import planRoutes from "./features/plan/planRoutes.js";
 import recordRoutes from "./features/record/recordRoutes.js";
+import earlyWithdrawRoutes from "./features/withdrawEarly/earlyWithdraw.route.js";
+import withdrawFundRoutes from "./features/withdraw-funds/withdrawFunds.routes.js";
 
  /* <============================  ADMIN IMPORT ================================> */
 import adminLoginRoute from "./admin-backend/features/adminLogin/adminLoginRoute.js";
@@ -210,7 +211,6 @@ app.use("/api/admin/treasury", treasuryPayoutRoutes);
 app.use("/api/admin/treasury", createPayoutRoutes);
 app.use("/api/admin/treasury/recipient", treasuryRecipientRoutes);
 app.use("/api/admin/settlement", platformSettlementRoutes);
-app.use('/api/admin/withdrawals', withdrawalRoutes);
 app.use('/api/smart-logic', smartLogicRoutes);
 app.use('/api/obscura', obscuraLogicRoutes);
 app.use('/api/sentinel', sentinelRoutes);
@@ -259,6 +259,8 @@ app.use("/api/records", recordRoutes);
 app.use("/api", bankRoutes);
 app.use("/api/activity", activityLogRoutes);
 app.use("/api/transfer", toBankRoutes);
+app.use("/api/early-withdraw", earlyWithdrawRoutes);
+app.use("/api/fund-bank", withdrawFundRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/me", meRoutes, securityGuard);
 app.use("/api/dashboard", dashboardRoutes, securityGuard);
@@ -274,7 +276,6 @@ app.use("/api", uploadRoutes, securityGuard);
 app.use("/api/user", userRoutes, securityGuard);
 app.use("/api/tx", txRoutes, securityGuard);
 app.use("/api/paystack", paystackRoutes, securityGuard);
-app.use("/api/withdraw", withdrawalRoutes);
 
 
 
