@@ -57,7 +57,8 @@ const activityLogSchema = new mongoose.Schema(
         "USSD",
         "BANK_TRANSFER",
         "A2A",
-        "EARLY_WITHDRAW"
+        "EARLY_WITHDRAW",
+        "WITHDRAW_FUND"
       ],
       required: true,
       index: true,
@@ -72,7 +73,8 @@ const activityLogSchema = new mongoose.Schema(
         "DEPOSIT",
         "TO_BANK",
         "A2A",
-        "EARLY_WITHDRAW"
+        "EARLY_WITHDRAW",
+        "WITHDRAW_FUND"
       ],
       required: true,
       index: true,

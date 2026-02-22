@@ -21,33 +21,88 @@ export const withdrawFunds = async (req, res) => {
     session.startTransaction();
 
     const userId = req.user.id;
-    const { planId } = req.body;
-
-    console.log("🟡 RAW req.body:", req.body);
-    console.log("🟡 planId from body:", planId);
-    console.log("🟡 typeof planId:", typeof planId);
     const {
       amount,
-      bankName,
-      bankCode,
-      accountNumber,
-      accountName,
       narration,
+      planId ,
     } = req.body;
+
+     if (isDev) {
+ console.log("🟡 RAW req.body:", req.body);
+    console.log("🟡 planId from body:", planId);
+    console.log("🟡 typeof planId:", typeof planId);
+  }
     
     if (isDev) {
  console.log("📦 STEP 1: BODY", {
   amount,
-  bankName,
-  bankCode,
-  accountNumber,
-  accountName,
   narration,
 });
     }
-    // 1️⃣ Validate input
-    if (
-      !amount ||
+
+  if (!planId) {
+  await session.abortTransaction();
+  session.endSession();
+  return res.status(400).json({
+    message: "planId is required",
+  });
+}
+
+const plan = await Plan.findOne({
+  _id: planId,
+  userId,
+}).session(session);
+
+
+
+if (!plan) {
+  await session.abortTransaction();
+  session.endSession();
+  return res.status(404).json({
+    message: "Savings plan not found or does not belong to user",
+  });
+}
+
+
+
+if (isDev) {
+  console.log("✅ RESOLVED PLAN:", {
+    planId,
+    status: plan.status,
+    balance: plan.balance,
+  });
+}
+    if (isDev) {
+    console.log("👛 STEP 5 RESULT: plan =", plan);
+    }
+
+
+
+ 
+    if (plan.status === "archived") {
+  return res.status(410).json({
+    message: "This plan has been archived"
+  });
+}
+
+if (isDev) {
+console.log("PLAN WITHDRAW ACCOUNT:", plan.withdrawalAccount);
+}
+    if (!plan.withdrawalAccount || !plan.withdrawalAccount.accountNumber) {
+  await session.abortTransaction()
+  session.endSession()
+  return res.status(400).json({
+    message: "No withdrawal account saved for this plan"
+  })
+}
+
+
+const bankName = plan.withdrawalAccount.bankName
+const bankCode = plan.withdrawalAccount.bankCode
+const accountNumber = plan.withdrawalAccount.accountNumber
+const accountName = plan.withdrawalAccount.accountName
+
+ if (
       !bankName ||
       !bankCode ||
       !accountNumber ||
@@ -62,7 +117,7 @@ export const withdrawFunds = async (req, res) => {
  }
 
          // 4️⃣ Generate reference
-   const reference = `TB-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+   const reference = `WF-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
    if (isDev) {
    console.log("🔖 STEP 2: REFERENCE =", reference);
 console.log("🔍 STEP 3: Checking pending transaction...");
@@ -129,6 +184,7 @@ if (amount >= LIMITS.TO_BANK.cooldown.thresholdAmount) {
   }
 }
 
+
 if (isDev) {
    console.log("👛 STEP 5: Fetching wallet for userId =", userId);
 }
@@ -144,26 +200,6 @@ if (isDev) {
 
   console.log("DEBUG userId:", userId);
 
-if (!planId) {
-  await session.abortTransaction();
-  session.endSession();
-  return res.status(400).json({
-    message: "planId is required",
-  });
-}
-
-const plan = await Plan.findOne({
-  _id: planId,
-  userId,
-}).session(session);
-
-if (!plan) {
-  await session.abortTransaction();
-  session.endSession();
-  return res.status(404).json({
-    message: "Savings plan not found or does not belong to user",
-  });
-}
 
 
 if (isDev) {
@@ -177,13 +213,6 @@ if (isDev) {
     console.log("👛 STEP 5 RESULT: plan =", plan);
     }
 
-
-
-    if (plan.status === "completed") {
-  return res.status(410).json({
-    message: "This savings plan has already been completed"
-  });
-}
 
     // 3️⃣ Balance check
     if (plan.balance < totalDebit) {

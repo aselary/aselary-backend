@@ -7,6 +7,8 @@ import morgan from "morgan";
 import cors from "cors";
 import helmet from "helmet";           // For security
 import rateLimit from "express-rate-limit"; // Rate limiter  
+import cron from "node-cron";
+import runPlanAutoEngine from "./features/services/runPlanAutoEngine.js";
 import isDev from "./features/utils/isDev.js"; 
 import paystackWebhookRoute from "./features/stack/paystackWebhook.route.js";     
 import signupRoutes from "./features/signup/signup.routes.js"; // Signup feature
@@ -49,6 +51,7 @@ import planRoutes from "./features/plan/planRoutes.js";
 import recordRoutes from "./features/record/recordRoutes.js";
 import earlyWithdrawRoutes from "./features/withdrawEarly/earlyWithdraw.route.js";
 import withdrawFundRoutes from "./features/withdraw-funds/withdrawFunds.routes.js";
+import setFundingPlansRoute from "./features/fundPlan/setFundingPlan.route.js";
 
  /* <============================  ADMIN IMPORT ================================> */
 import adminLoginRoute from "./admin-backend/features/adminLogin/adminLoginRoute.js";
@@ -168,32 +171,72 @@ const ussdLimiter = rateLimit({
 });
 
 
+
 mongoose
   .connect(process.env.MONGODB_URI)
-  .then(() => {
-   if (isDev) {
-      console.log("✅ MongoDB connected");
-    }
+  .then(async () => {
+  if (isDev) {
+  console.log("✅ MongoDB connected");
+  }
 
-    // ✅ START JOB ONLY AFTER DB IS READY
-    setInterval(async () => {
-      try {
-        await expirePendingTransactions();
-        await expirePendingToBank();
-      } catch (err) {
-        console.error("Auto-expire job failed:", err);
+  /*
+  ===============================
+  EXPIRE JOB
+  ===============================
+  */
+  setInterval(async () => {
+    try {
+      await expirePendingTransactions();
+      await expirePendingToBank();
+    } catch (err) {
+      if (isDev) {
+      console.error("Auto-expire job failed:", err);
       }
-    }, 60 * 1000);
-  })
-  .catch(err => {
-       if (isDev) {
-    console.error("❌ MongoDB failed. Shutting down.", err);
-       }
-    process.exit(1);
-  });
+    }
+  }, 60 * 1000);
 
+
+  /*
+  ===============================
+  🔥 PLAN AUTO ENGINE CRON
+  ===============================
+  */
+  if (isDev) {
+  console.log("🔥 PLAN CRON LOADED");
+  }
+
+  const schedule = isProd
+    ? "* * * * *"
+    : "*/5 * * * * *";
+
+  cron.schedule(schedule, async () => {
+    if (isDev) {
+    console.log("⏰ CRON TICK...");
+    }
+    try {
+      await runPlanAutoEngine();
+    } catch (error) {
+      if (isDev) {
+      console.error("❌ Plan engine failed:", error);
+      }
+    }
+  });
+   
+  if (isDev) {
+  console.log("🚀 Plan Engine Started");
+  }
+
+})
+.catch((err) => {
+  if (isDev) {
+  console.error("❌ MongoDB failed:", err);
+  }
+  process.exit(1);
+});
            
 
+
+           
 
 
 
@@ -261,6 +304,7 @@ app.use("/api/activity", activityLogRoutes);
 app.use("/api/transfer", toBankRoutes);
 app.use("/api/early-withdraw", earlyWithdrawRoutes);
 app.use("/api/fund-bank", withdrawFundRoutes);
+app.use("/api/plan", setFundingPlansRoute);
 app.use("/api/profile", profileRoutes);
 app.use("/api/me", meRoutes, securityGuard);
 app.use("/api/dashboard", dashboardRoutes, securityGuard);

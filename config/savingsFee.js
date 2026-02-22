@@ -1,30 +1,40 @@
-export const WITHDRAW_FUND_FEES = [
-  {
-    min: 1,
-    max: 4999,
-    fee: 30,
-  },
-  {
-    min: 5000,
-    max: 19999,
-    fee: 50,
-  },
-  
-  {
-    min: 20000,
-    max:  59999,
-    fee: 50,
-  },
+export const WITHDRAW_FEE = {
+ calculate(amount) {
 
-   {
-    min: 60000,
-    max: 199999,
-    fee: 70,
-  },
+    amount = Number(amount);
+    if (!amount || amount <= 0) return 0;
 
-  {
-    min: 200000,
-    max: Infinity,
-    fee: 120,
-  },
-];
+    let percent = 0;
+    let cap = 0;
+
+    // 🟢 SMALL USERS (₦1k – ₦50k)
+    if (amount <= 50000) {
+      percent = 1.7;
+      cap = 1500;
+    }
+
+    // 🟡 MID USERS (₦50k – ₦500k)
+    else if (amount <= 500000) {
+      percent = 1.7;
+      cap = 7000;
+    }
+
+    // 🔵 BIG USERS (₦500k – ₦2M)
+    else if (amount <= 2000000) {
+      percent = 1.7;
+      cap = 20000;
+    }
+
+    // 👑 MEGA USERS (₦2M+)
+    else {
+      percent = 1.7;
+      cap = 50000;
+    }
+
+    // calculate fee
+    let fee = Math.floor((amount * percent) / 100);
+
+    // apply cap
+    return Math.min(fee, cap);
+  }
+};

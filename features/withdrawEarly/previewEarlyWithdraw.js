@@ -1,9 +1,13 @@
-import { EARLY_WITHDRAW_PENALTY } from "../../config/penalty.js";
+import { calculateEarlyWithdrawalPenalty } from "../utils/calculateEarlyWithdrawalPenalty.js";
 import isDev from "../utils/isDev.js";
+import Plan from "../models/Plan.js";
 
 export const previewEarlyWithdraw = async (req, res) => {
   try {
-    const { amount } = req.body;
+    if (isDev) {
+    console.log("PREVIEW BODY:", req.body);
+    }
+    const { amount, planId } = req.body;
 
     if (!amount || amount <= 99) {
       return res.status(400).json({
@@ -11,20 +15,33 @@ export const previewEarlyWithdraw = async (req, res) => {
       });
     }
 
-    // ✅ EARLY WITHDRAW PENALTY LOGIC (INLINE)
-    // ✅ EARLY WITHDRAW PENALTY (10% capped at ₦2,000)
-let penalty = 0;
 
-if (EARLY_WITHDRAW_PENALTY.type === "percentage") {
-  penalty = Math.floor((amount * EARLY_WITHDRAW_PENALTY.value) / 100);
+     // 🔒 get plan
+        const plan = await Plan.findById(planId);
+    
+        if (!plan) {
+          return res.status(404).json({
+            message: "Plan not found"
+          });
+        }
+    
+        // 🚨 BLOCK FEE CHECK IF AMOUNT > PLAN BALANCE
+        if (Number(amount) > Number(plan.balance)) {
+          return res.status(400).json({
+            message: "Amount exceeds your plan balance"
+          });
+        }
 
-  // 🔒 CAP PENALTY AT ₦2,000
-  if (penalty > 2000) {
-    penalty = 2000;
-  }
-}
 
-  const totalDebit = amount + penalty;
+   const penalty = calculateEarlyWithdrawalPenalty(amount);
+   const totalDebit = amount + penalty;
+
+     if (isNaN(penalty) || isNaN(totalDebit)) {
+     return res.status(500).json({
+       message: "Penalty calculation failed",
+     });
+   }
+   
 
 
     return res.status(200).json({

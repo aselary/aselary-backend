@@ -1,14 +1,34 @@
 import Plan from "../models/Plan.js";
+import isDev from "../utils/isDev.js";
+
 
 export const createPlan = async (req, res) => {
   try {
-    const { amount, frequency, duration, startDate, narration } = req.body;
+    const { amount, frequency, duration, startDate, narration, withdrawalAccount } = req.body;
 
     // ✅ Validate inputs
     if (!amount || !frequency || !duration || !startDate) {
       return res.status(400).json({
         message: "Amount, frequency, duration and start date are required",
       });
+    }
+
+    const amt = Number(amount);
+
+   if (isNaN(amt) || amt < 100) {
+    return res.status(400).json({
+       message: "Minimum saving amount is ₦100"
+      });
+    }
+
+        if (!withdrawalAccount || 
+            !withdrawalAccount.bankName || 
+            !withdrawalAccount.bankCode || 
+            !withdrawalAccount.accountNumber || 
+            !withdrawalAccount.accountName) {
+               return res.status(400).json({
+                message: "Withdrawal account is required"
+       });
     }
 
     if (!["daily", "weekly", "monthly"].includes(frequency)) {
@@ -44,7 +64,6 @@ export const createPlan = async (req, res) => {
     if (frequency === "monthly") {
       endDate.setMonth(endDate.getMonth() + Number(duration));
     }
-     const amt = Number(amount);
     // calculate real number of days
    const diffMs = endDate.getTime() - start.getTime();
    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -64,6 +83,9 @@ const totalTarget = amt * diffDays;
     // ✅ Generate reference
     const reference = `PLN-${Date.now().toString().slice(-6)}`;
 
+
+    let nextRunAt = new Date(start); // first deduction immediately
+
     // ✅ Create plan
     const plan = new Plan({
       userId: req.user.id,
@@ -77,7 +99,17 @@ const totalTarget = amt * diffDays;
       reference,
       totalTarget,
       status: "active",
-    });
+
+      nextRunAt,
+
+      withdrawalAccount: {
+      bankName: withdrawalAccount.bankName,
+      bankCode: withdrawalAccount.bankCode,
+      accountNumber: withdrawalAccount.accountNumber,
+      accountName: withdrawalAccount.accountName,
+      locked: false
+    },
+ });
 
     await plan.save();
 
@@ -86,7 +118,9 @@ const totalTarget = amt * diffDays;
       plan,
     });
   } catch (error) {
+    if (isDev) {
     console.error("Create plan error:", error);
+    }
     return res.status(500).json({
       message: "Server error creating plan",
     });
@@ -114,11 +148,16 @@ export const getMyPlans = async (req, res) => {
     );
 
     // 📦 Fetch user plans
-    const plans = await Plan.find({ userId }).sort({ createdAt: -1 });
+const plans = await Plan.find({
+  userId,
+  status: { $in: ["active", "completed", "closing", "terminated"] }
+}).sort({ createdAt: -1 });
 
     return res.status(200).json(plans);
   } catch (error) {
+    if (isDev) {
     console.error("Get plans error:", error);
+    }
     return res.status(500).json({
       message: "Failed to fetch plans",
     });

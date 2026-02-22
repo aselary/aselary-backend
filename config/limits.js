@@ -12,12 +12,12 @@ export const LIMITS = {
   },
 
   TO_BANK: {
-    maxPerTransaction: 100_000,
-    maxDailyTotal: 200_000,
+    maxPerTransaction: 5_000_000,
+    maxDailyTotal: 10_000_000,
     maxSameBankPerDay: 2,
     cooldown: {
-      thresholdAmount: 100_000, // stricter
-      minutes: 60, // 1 hour
+      thresholdAmount: 2_000_000, // stricter
+      minutes: 30, // 30 mins cooldown
     },
   },
 };

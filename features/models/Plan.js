@@ -59,11 +59,59 @@ const planSchema = new mongoose.Schema(
       default: ""
     },
 
+    nextRunAt: {
+      type: Date,
+      required: true
+    },
+
+    missedCount: {
+      type: Number,
+      default: 0
+    },
+
+    withdrawalAccount: {
+
+    bankName: {
+      type: String,
+      required: true,
+    },
+
+    bankCode: {
+      type: String,
+      required: true
+    },
+
+    accountNumber: {
+      type: String,
+      required: true
+    },
+
+    accountName: {
+      type: String,
+      required: true
+    },
+    
+    locked: {
+      type: Boolean,
+      default: false
+    }
+  },
+
     status: {
       type: String,
-      enum: ["active", "completed", "closing", "terminated"],
+      enum: ["active", "completed", "closing", "terminated", "archived"],
       default: "active",
     },
+
+    terminatedAt: {
+      type: Date,
+      default: null
+    },
+
+    archivedAt: {
+      type: Date,
+      default: null
+    }
   },
   { timestamps: true }
 );

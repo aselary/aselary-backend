@@ -7,46 +7,104 @@ import addPlatformFee from "../utils/addPlatformFee.js";
 import PlatformLedger from "../models/PlatformLedger.js";
 import Wallet from "../models/Wallet.js";
 import { LIMITS } from "../../config/limits.js";
-import { EARLY_WITHDRAW_PENALTY } from "../../config/penalty.js";
 import Plan from "../models/Plan.js";
 import { getDailyTransferTotal } from "../utils/getDailyTransferTotal.js";
 import { createTransferRecipient } from "../transfer/createRecipient.js";
 import { initiatePaystackTransfer } from "../transfer/initiateTransfer.js";
 import isDev from "../utils/isDev.js";
 import { paystackRequest }from "../utils/paystack.js";
+import { calculateEarlyWithdrawalPenalty } from "../utils/calculateEarlyWithdrawalPenalty.js";
 
 export const earlyWithdraw = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     const userId = req.user.id;
-     const { planId } = req.body;
-
-console.log("🟡 RAW req.body:", req.body);
-console.log("🟡 planId from body:", planId);
-console.log("🟡 typeof planId:", typeof planId);
     const {
       amount,
-      bankName,
-      bankCode,
-      accountNumber,
-      accountName,
       narration,
+      planId
     } = req.body;
 
+     if (isDev) {
+       console.log("🟡 RAW req.body:", req.body);
+       console.log("🟡 planId from body:", planId);
+       console.log("🟡 typeof planId:", typeof planId);
+ }
     if (isDev) {
  console.log("📦 STEP 1: BODY", {
   amount,
-  bankName,
-  bankCode,
-  accountNumber,
-  accountName,
   narration,
 });
     }
     // 1️⃣ Validate input
     if (
-      !amount ||
+      !amount
+    ) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (!planId) {
+  await session.abortTransaction();
+  session.endSession();
+  return res.status(400).json({
+    message: "planId is required",
+  });
+}
+
+const plan = await Plan.findOne({
+  _id: planId,
+  userId,
+}).session(session);
+
+
+
+if (!plan) {
+  await session.abortTransaction();
+  session.endSession();
+  return res.status(404).json({
+    message: "Savings plan not found or does not belong to user",
+  });
+}
+
+
+
+if (isDev) {
+  console.log("✅ RESOLVED PLAN:", {
+    planId,
+    status: plan.status,
+    balance: plan.balance,
+  });
+}
+    if (isDev) {
+    console.log("👛 STEP 5 RESULT: plan =", plan);
+    }
+
+
+
+    if (plan.status === "terminated") {
+   await session.abortTransaction();
+   session.endSession();
+   return res.status(400).json({
+      message: "This plan is no longer active"
+   });
+}
+
+
+    if (!plan.withdrawalAccount || !plan.withdrawalAccount.accountNumber) {
+  await session.abortTransaction()
+  session.endSession()
+  return res.status(400).json({
+    message: "No withdrawal account saved for this plan"
+  })
+}
+
+const bankName = plan.withdrawalAccount.bankName
+const bankCode = plan.withdrawalAccount.bankCode
+const accountNumber = plan.withdrawalAccount.accountNumber
+const accountName = plan.withdrawalAccount.accountName
+
+ if (
       !bankName ||
       !bankCode ||
       !accountNumber ||
@@ -66,16 +124,10 @@ console.log("🟡 typeof planId:", typeof planId);
 console.log("🔍 STEP 3: Checking pending transaction...");
    }
 
-    let penalty = 0;
-  if (EARLY_WITHDRAW_PENALTY.type === "percentage") {
-  penalty = (amount * EARLY_WITHDRAW_PENALTY.value) / 100;
-   } else {
-    penalty = EARLY_WITHDRAW_PENALTY.value;
-   }
-
+ const penalty = calculateEarlyWithdrawalPenalty(amount);
 const totalDebit = amount + penalty;
     if (isDev) {
-     console.log("💸 STEP 4: fee & totalDebit", { penalty, totalDebit });
+     console.log("💸 STEP 4: penalty & totalDebit", { penalty, totalDebit });
     }
 
 // 1️⃣ Per-transaction limit
@@ -151,53 +203,11 @@ if (isDev) {
 
 console.log("DEBUG userId:", userId);
 
-if (!planId) {
-  await session.abortTransaction();
-  session.endSession();
-  return res.status(400).json({
-    message: "planId is required",
-  });
-}
-
-const plan = await Plan.findOne({
-  _id: planId,
-  userId,
-}).session(session);
-
-if (!plan) {
-  await session.abortTransaction();
-  session.endSession();
-  return res.status(404).json({
-    message: "Savings plan not found or does not belong to user",
-  });
-}
-
-
-if (isDev) {
-  console.log("✅ RESOLVED PLAN:", {
-    planId,
-    status: plan.status,
-    balance: plan.balance,
-  });
-}
-    if (isDev) {
-    console.log("👛 STEP 5 RESULT: plan =", plan);
-    }
-
-
-
-    if (plan.status === "terminated") {
-  return res.status(410).json({
-    message: "This savings plan has already been terminated"
-  });
-}
-
-    // 3️⃣ Balance check
+  // 3️⃣ Balance check
     if (plan.balance < totalDebit) {
       return res.status(400).json({ message: `Insufficient balance. You need ₦${totalDebit}` });
     }
-
-
+    
 try {
     const existing = await ToBankTransaction.findOne({
   planId,
@@ -518,19 +528,21 @@ export const completeEarlyWithdraw = async (req, res) => {
     plan.balance -= totalDebit;
     if (isDev) {
     console.log("[COMPLETE_EARLY_WITHDRAW] DEBIT CALC", {
-  balanceBefore,
-  amount: ew.amount,
-  penalty,
-  totalDebit,
-});
-    }
+     balanceBefore,
+     amount: ew.amount,
+     penalty,
+     totalDebit,
+    });
+     }
     await plan.save({ session });
 
-    if (plan.balance <= 0) {
-  plan.status = "completed";
-  plan.withdrawLocked = false;
-  await plan.save({ session });
-}
+   // 🔴 TERMINATE PLAN AFTER EARLY WITHDRAW
+    plan.status = "terminated";
+    plan.withdrawLocked = false;
+    plan.nextRunAt = null;
+    plan.terminatedAt = new Date();
+
+    await plan.save({ session });
 
     if (isDev) {
     console.log("[COMPLETE_EARLY_WITHDRAW] WALLET DEBITED", {

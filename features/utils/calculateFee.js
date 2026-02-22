@@ -1,6 +1,6 @@
-export const calculateFee = (amount, feeTable) => {
-  for (const tier of feeTable) {
-    if (amount <= tier.max) return tier.fee;
-  }
-  return 0;
-};
+import { WITHDRAW_FEE } from "../../config/savingsFee.js";
+
+export function calculateFee(amount) {
+  if (!amount || amount <= 0) return 0;
+  return WITHDRAW_FEE.calculate(amount);
+}

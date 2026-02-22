@@ -28,7 +28,7 @@ const ledgerSchema = new mongoose.Schema(
     
     type: {
       type: String,
-      enum: ["CREDIT", "DEBIT"],
+      enum: ["CREDIT", "DEBIT", "PLAN_AUTO_IN"],
       required: true,
     },
 
@@ -36,7 +36,8 @@ const ledgerSchema = new mongoose.Schema(
       type: String,
       enum: [
              "DEPOSIT", "WITHDRAWAL", "A2A", "REVERSAL", "CHARGE", "TO_BANK", "TO_BANK_FEE", 
-             "TO_BANK_REVERSAL", "paystack", "PLAN_EARLY_WITHDRAW", "PLAN_WITHDRAW_FUND"
+             "TO_BANK_REVERSAL", "paystack", "PLAN_EARLY_WITHDRAW", "PLAN_WITHDRAW_FUND", 
+             "PLAN_AUTO_IN"
             ],
       required: true,
     },
@@ -59,6 +60,7 @@ const ledgerSchema = new mongoose.Schema(
     reference: {
       type: String,
       index: true,
+      unique: true,
       required: true,
     },
 

@@ -282,6 +282,7 @@ if (amount < MIN_DEPOSIT) {
       const balanceBefore = wallet.balance;
       wallet.balance += amount;
       await wallet.save();
+
       const balanceAfter = wallet.balance;
 
      

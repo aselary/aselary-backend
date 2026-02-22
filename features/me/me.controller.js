@@ -7,7 +7,7 @@ export const getMe = async (req, res) => {
     }
 
     const user = await User.findById(req.user.id).select(
-      "fullName email phoneNumber emailVerified phoneVerified"
+      "fullName email phoneNumber emailVerified phoneVerified selectedFundingPlans"
     );
 
     if (!user) {
@@ -21,6 +21,7 @@ export const getMe = async (req, res) => {
       phoneNumber: user.phoneNumber ?? "",
       emailVerified: user.emailVerified ?? false,
       phoneVerified: user.phoneVerified ?? false,
+      selectedFundingPlans: user.selectedFundingPlans || [],
     });
   } catch (e) {
     return res.status(500).json({ error: "Server error" });
