@@ -744,7 +744,7 @@ export const verifyEarlyWithdrawOtp = async (req, res) => {
       "/transfer/finalize_transfer",
       "POST",
       {
-        transfer_code: tx.transferCode,
+        transfer_code: ew.transferCode,
         otp,
       }
     );
