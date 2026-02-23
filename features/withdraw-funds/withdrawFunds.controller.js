@@ -280,25 +280,6 @@ if (!recipientCode) {
   reason: narration,
 });
 
-  // 🔐 MOCK PAYSTACK RESPONSE (ONLY HERE)
-  if (process.env.MOCK_PAYSTACK === "true") {
-    // Simulate Paystack asking for OTP
-    withdrawFundTxn.status = "OTP_REQUIRED";
-    withdrawFundTxn.transferCode = "MOCK_TRANSFER_CODE";
-    withdrawFundTxn.otpRequestedAt = new Date();
-  
-    await withdrawFundTxn.save({ session });
-  
-    if (isDev) {
-      console.log("🧪 MOCK PAYSTACK → OTP_REQUIRED");
-    }
-  
-    return res.json({
-      success: true,
-      status: "OTP_REQUIRED",
-      reference,
-    });
-  }
 
 
   if (isDev) {
@@ -775,28 +756,6 @@ export const verifyWithdrawFundOtp = async (req, res) => {
         message: "Transaction not awaiting OTP",
       });
     }
-
-      if (process.env.MOCK_PAYSTACK_OTP === "true") {
-  // Optional: enforce mock OTP value
-  if (otp !== "123456") {
-    return res.status(400).json({
-      message: "Invalid mock OTP",
-    });
-  }
-
-  // ✅ Simulate Paystack success
-  wf.status = "SUCCESS";
-  wf.otpVerifiedAt = new Date();
-  wf.completedAt = new Date();
-  await wf.save();
-
-  return res.json({
-    success: true,
-    message: "Transfer completed (mocked)",
-    reference,
-    status: "SUCCESS",
-  });
-}
 
     if (!wf.transferCode) {
       return res.status(400).json({
