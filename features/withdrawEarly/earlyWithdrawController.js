@@ -434,13 +434,13 @@ export const completeEarlyWithdraw = async (req, res) => {
 
   const session = await mongoose.startSession();
   session.startTransaction();
-    if (isDev) {
+ 
   console.log("[COMPLETE_EARLY_WITHDRAW] START", { reference });
-    }
+
   try {
     
     const ew = await ToBankTransaction.findOne({ reference }).session(session);
-    if (isDev) {
+    
     console.log("[COMPLETE_EARLY_WITHDRAW] EW FOUND", {
   id: ew?._id,
   status: ew?.status,
@@ -448,7 +448,7 @@ export const completeEarlyWithdraw = async (req, res) => {
   penalty: ew?.penalty,
   walletId: ew?.walletId,
 });
-}
+
    const wallet = await Wallet.findById(ew.walletId)
    .select("balance internalNuban accountNumber")
    .session(session);
@@ -470,9 +470,9 @@ export const completeEarlyWithdraw = async (req, res) => {
     message: "OTP not verified",
   });
 }
-     if (isDev) {
+    
     console.log("[COMPLETE_EARLY_WITHDRAW] STATUS CHECK PASSED", ew.status);
-     }
+     
    if (!["OTP_VERIFIED", "PENDING"].includes(ew.status)) {
   await session.abortTransaction();
   session.endSession();
@@ -487,12 +487,12 @@ export const completeEarlyWithdraw = async (req, res) => {
     if (!plan) {
        throw new Error("Plan not found");
       }
-   if (isDev) {
+
     console.log("[COMPLETE_EARLY_WITHDRAW] WALLET FOUND", {
   planId: plan?._id,
   balance: plan?.balance,
 });
-   }
+   
 
     
     const balanceBefore = plan.balance;
@@ -505,14 +505,14 @@ export const completeEarlyWithdraw = async (req, res) => {
 
     
     plan.balance -= totalDebit;
-    if (isDev) {
+
     console.log("[COMPLETE_EARLY_WITHDRAW] DEBIT CALC", {
      balanceBefore,
      amount: ew.amount,
      penalty,
      totalDebit,
     });
-     }
+     
     await plan.save({ session });
 
    // 🔴 TERMINATE PLAN AFTER EARLY WITHDRAW
@@ -523,11 +523,11 @@ export const completeEarlyWithdraw = async (req, res) => {
 
     await plan.save({ session });
 
-    if (isDev) {
+  
     console.log("[COMPLETE_EARLY_WITHDRAW] WALLET DEBITED", {
   balanceAfter: plan.balance,
 });
-    }
+
 
     const balanceAfter = plan.balance;
 
@@ -582,9 +582,8 @@ export const completeEarlyWithdraw = async (req, res) => {
 
 
     ew.status = "SUCCESS";
-    if (isDev) {
     console.log("[COMPLETE_EARLY_WITHDRAW] SETTING EW SUCCESS");
-    }
+    
     ew.completedAt = new Date();
     await ew.save({ session });
 
@@ -603,9 +602,9 @@ export const completeEarlyWithdraw = async (req, res) => {
     );
 
     await session.commitTransaction();
-    if (isDev) {
+    
     console.log("[COMPLETE_EARLY_WITHDRAW] COMMITTING TRANSACTION");
-          }
+          
     session.endSession();
 
     return res.json({
@@ -616,9 +615,9 @@ export const completeEarlyWithdraw = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-     if (isDev) {
+  
     console.error("COMPLETE EARLY_WITHDRAW ERROR:", error);
-     }
+     
      
 
     return res.status(500).json({
