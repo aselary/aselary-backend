@@ -74,7 +74,6 @@ if (
 
   if (!ledger) return res.sendStatus(200);
 
- }
  
 
  if (event.event === "transfer.success") {
@@ -86,14 +85,11 @@ if (
   // ===============================
   if (ledger.source === "PLAN_EARLY_WITHDRAW") {
 
-    const { completeEarlyWithdraw } = await import(
+    const { completeEarlyWithdrawInternal } = await import(
       "../withdrawEarly/earlyWithdrawController.js"
     );
 
-    await completeEarlyWithdraw(
-      { body: { reference } },
-      { json: () => {}, status: () => ({ json: () => {} }) }
-    );
+    await completeEarlyWithdrawInternal(reference);
 
     await ActivityLog.findOneAndUpdate(
       { reference },
@@ -132,7 +128,6 @@ if (
   return res.sendStatus(200);
 }
 
-  
 
   if (event.event === "transfer.failed") {
     const wallet = await Wallet.findById(ledger.walletId);
@@ -156,6 +151,8 @@ if (
 
     return res.sendStatus(200);
   }
+}
+
 }
 
       let accountNumber = null;
