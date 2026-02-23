@@ -19,7 +19,7 @@ router.post(
     
 
     try {
-      const MIN_DEPOSIT = 100
+      const MIN_DEPOSIT = 0
      
       const hash = crypto
         .createHmac("sha512", process.env.PAYSTACK_SECRET_KEY)
