@@ -63,12 +63,12 @@ await FraudLog.create({
   riskScore: riskResult.score,
 });
 
-/* ⛔ BLOCK very high risk */
-if (riskResult.blocked) {
-  return res.status(403).json({
-    success: false,
-    message: riskResult.reason || "High risk action blocked",
-  });
+// if completing verified withdrawal, never block
+if (riskResult.blocked && !req.body.reference) {
+ return res.status(403).json({
+  success:false,
+  message: riskResult.reason || "High risk action blocked"
+ });
 }
 
 /* ⚠️ THROTTLE medium risk */
