@@ -57,28 +57,82 @@ if (
   data?.reference &&
   data?.reason === "withdrawal"
 ) {
+
+  // ===============================
+if (
+  event.event === "transfer.success" ||
+  event.event === "transfer.failed"
+) {
+
+  const reference = data.reference;
+
+  // 🔎 Find ledger FIRST (used by both success & failed)
   const ledger = await Ledger.findOne({
-    _id: data.reference,
-    source: "withdrawal",
-    status: "PENDING",
+    reference,
+    status: "PENDING"
   });
 
-  if (!ledger) {
-    return res.sendStatus(200);
-  }
+  if (!ledger) return res.sendStatus(200);
 
-  if (event.event === "transfer.success") {
-    ledger.status = "SUCCESS";
-    ledger.completedAt = new Date();
-    await ledger.save();
+ }
+ 
+
+ if (event.event === "transfer.success") {
+
+  const reference = data.reference;
+
+  // ===============================
+  // 🧠 EARLY WITHDRAW (FROM PLAN)
+  // ===============================
+  if (ledger.source === "PLAN_EARLY_WITHDRAW") {
+
+    const { completeEarlyWithdraw } = await import(
+      "../withdrawEarly/earlyWithdrawController.js"
+    );
+
+    await completeEarlyWithdraw(
+      { body: { reference } },
+      { json: () => {}, status: () => ({ json: () => {} }) }
+    );
 
     await ActivityLog.findOneAndUpdate(
-      { reference: data.reference },
+      { reference },
       { status: "SUCCESS" }
     );
 
     return res.sendStatus(200);
   }
+
+  // ===============================
+  // 🧠 NORMAL WITHDRAW (FROM WALLET)
+  // ===============================
+  if (
+    ledger.source === "PLAN_WITHDRAW_FUND" ||
+    ledger.source === "WITHDRAWAL" ||
+    ledger.source === "TO_BANK"
+  ) {
+
+    const { completeWithdrawFund } = await import(
+      "../withdraw-funds/withdrawFunds.controller.js"
+    );
+
+    await completeWithdrawFund(
+      { body: { reference } },
+      { json: () => {}, status: () => ({ json: () => {} }) }
+    );
+
+    await ActivityLog.findOneAndUpdate(
+      { reference },
+      { status: "SUCCESS" }
+    );
+
+    return res.sendStatus(200);
+  }
+
+  return res.sendStatus(200);
+}
+
+  
 
   if (event.event === "transfer.failed") {
     const wallet = await Wallet.findById(ledger.walletId);

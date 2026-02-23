@@ -10,7 +10,7 @@ export const previewWithdrawFunds = async (req, res) => {
     }
     const { amount, planId } = req.body;
 
-    if (!amount || amount <= 99) {
+    if (!amount || amount <= 50) {
       return res.status(400).json({
         message: "Invalid amount"
       });

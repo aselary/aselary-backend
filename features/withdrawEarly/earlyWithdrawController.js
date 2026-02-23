@@ -449,13 +449,13 @@ export const completeEarlyWithdraw = async (req, res) => {
   walletId: ew?.walletId,
 });
 }
-          const wallet = await Wallet.findById(ew.walletId)
-              .select("balance internalNuban accountNumber")
-              .session(session);
+   const wallet = await Wallet.findById(ew.walletId)
+   .select("balance internalNuban accountNumber")
+   .session(session);
         
-            if (!wallet) {
-              throw new Error("Wallet not found");
-            }
+   if (!wallet) {
+    throw new Error("Wallet not found");
+    }
 
     if (!ew) {
       await session.abortTransaction();
