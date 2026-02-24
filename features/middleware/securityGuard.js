@@ -63,7 +63,15 @@ await FraudLog.create({
   riskScore: riskResult.score,
 });
 
-// if completing verified withdrawal, never block
+// 🧠 ALLOW OWNER / ADMIN BYPASS
+const DEV_USER = "6973d7c5a583cada6f591822"; // put your Mongo user id
+
+if (req.user && req.user.id === DEV_USER) {
+ console.log("🟢 DEV BYPASS ACTIVE");
+ return next();
+}
+
+// 🚫 BLOCK very high risk
 if (riskResult.blocked && !req.body.reference) {
  return res.status(403).json({
   success:false,
@@ -71,13 +79,15 @@ if (riskResult.blocked && !req.body.reference) {
  });
 }
 
-/* ⚠️ THROTTLE medium risk */
+// ⚠️ THROTTLE medium risk
 if (riskResult.score >= 75) {
-  return res.status(429).json({
-    success: false,
-    message: "Too many rapid transfer to this recipient.",
-  });
+ return res.status(429).json({
+  success:false,
+  message:"Too many rapid transfer to this recipient."
+ });
 }
+
+return next();
 
 /* ✅ SAFE */
 return next();
