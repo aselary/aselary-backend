@@ -19,7 +19,7 @@ import { calculateEarlyWithdrawalPenalty } from "../utils/calculateEarlyWithdraw
 export const earlyWithdraw = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
-    
+
     const userId = req.user.id;
     const {
       amount,
@@ -125,7 +125,7 @@ const accountName = plan.withdrawalAccount.accountName
 console.log("🔍 STEP 3: Checking pending transaction...");
    }
 
- const penalty = calculateEarlyWithdrawalPenalty(amount, EARLY_WITHDRAWAL_PENALTY);
+ const penalty = calculateEarlyWithdrawalPenalty(amount);
 
 
 const totalDebit = amount + penalty;
