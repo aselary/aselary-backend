@@ -30,12 +30,17 @@ const toBankTransactionSchema = new mongoose.Schema(
      type: Number,
      required: true,
      default: 0,
-   },
+    },
 
-totalDebit: {
-  type: Number,
-  required: true,
-},
+   totalDebit: {
+     type: Number,
+     required: true,
+    },
+   
+    penalty: {
+     type: Number,
+     default: 0
+    },
 
     bankName: {
       type: String,
