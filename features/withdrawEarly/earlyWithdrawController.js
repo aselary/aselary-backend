@@ -125,6 +125,8 @@ console.log("🔍 STEP 3: Checking pending transaction...");
    }
 
  const penalty = calculateEarlyWithdrawalPenalty(amount);
+
+
 const totalDebit = amount + penalty;
     if (isDev) {
      console.log("💸 STEP 4: penalty & totalDebit", { penalty, totalDebit });
@@ -516,11 +518,17 @@ export const completeEarlyWithdraw = async (req, res) => {
     await plan.save({ session });
 
    // 🔴 TERMINATE PLAN AFTER EARLY WITHDRAW
-    plan.status = "terminated";
-    plan.withdrawLocked = false;
-    plan.nextRunAt = null;
-    plan.terminatedAt = new Date();
-
+    if (plan.balance <= 0) {
+  // only terminate if empty
+  plan.status = "terminated"
+  plan.withdrawLocked = false
+  plan.nextRunAt = null
+  plan.terminatedAt = new Date()
+  } else {
+  // still money left
+  plan.status = "active"
+  plan.withdrawLocked = false // allow user withdraw remaining anytime
+  }
     await plan.save({ session });
 
   
@@ -539,7 +547,7 @@ export const completeEarlyWithdraw = async (req, res) => {
       planId: plan._id,
       type: "DEBIT",
       source: "PLAN_EARLY_WITHDRAW",
-      amount: ew.amount,
+      amount: ew.totalDebit,
       balanceBefore,
       balanceAfter,
       narration: ew.narration,
