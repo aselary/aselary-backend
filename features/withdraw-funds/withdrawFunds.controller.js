@@ -124,6 +124,7 @@ console.log("🔍 STEP 3: Checking pending transaction...");
    }
 
     const fee = calculateFee(amount, TO_BANK_FEES);
+    
     const totalDebit = amount + fee;
     if (isDev) {
      console.log("💸 STEP 4: fee & totalDebit", { fee, totalDebit });

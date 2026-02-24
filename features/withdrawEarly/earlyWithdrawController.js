@@ -15,10 +15,11 @@ import isDev from "../utils/isDev.js";
 import { paystackRequest }from "../utils/paystack.js";
 import { calculateEarlyWithdrawalPenalty } from "../utils/calculateEarlyWithdrawalPenalty.js";
 
+
 export const earlyWithdraw = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
-
+    
     const userId = req.user.id;
     const {
       amount,
@@ -124,7 +125,7 @@ const accountName = plan.withdrawalAccount.accountName
 console.log("🔍 STEP 3: Checking pending transaction...");
    }
 
- const penalty = calculateEarlyWithdrawalPenalty(amount);
+ const penalty = calculateEarlyWithdrawalPenalty(amount, EARLY_WITHDRAWAL_PENALTY);
 
 
 const totalDebit = amount + penalty;
@@ -634,74 +635,6 @@ export const completeEarlyWithdraw = async (req, res) => {
   }
 };
 
-
-
-export const completeEarlyWithdrawInternal = async (reference) => {
-
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-
-    const ew = await ToBankTransaction.findOne({ reference }).session(session);
-    if (!ew) throw new Error("EW not found");
-
-    if (!["OTP_VERIFIED","PENDING"].includes(ew.status)) {
-      await session.abortTransaction();
-      session.endSession();
-      return;
-    }
-
-    const wallet = await Wallet.findById(ew.walletId)
-      .select("balance internalNuban accountNumber")
-      .session(session);
-
-    if (!wallet) throw new Error("Wallet not found");
-
-    const plan = await Plan.findById(ew.planId).session(session);
-    if (!plan) throw new Error("Plan not found");
-
-    const penalty = ew.penalty || 0;
-    const totalDebit = ew.amount + penalty;
-
-    if (plan.balance < totalDebit) {
-      throw new Error("Insufficient plan balance");
-    }
-
-    // deduct from plan
-    plan.balance -= totalDebit;
-    plan.status = "terminated";
-    plan.withdrawLocked = false;
-    plan.nextRunAt = null;
-    plan.terminatedAt = new Date();
-    await plan.save({ session });
-
-    // ledger
-    await Ledger.create([{
-      userId: ew.userId,
-      walletId: wallet._id,
-      planId: plan._id,
-      type: "DEBIT",
-      source: "PLAN_EARLY_WITHDRAW",
-      amount: ew.amount,
-      narration: ew.narration,
-      reference
-    }], { session });
-
-    ew.status = "SUCCESS";
-    ew.completedAt = new Date();
-    await ew.save({ session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-  } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error("INTERNAL EW ERROR:", err.message);
-    throw err;
-  }
-};
 
 
 export const failEarlyWithdraw = async (req, res) => {

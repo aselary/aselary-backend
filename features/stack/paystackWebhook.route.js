@@ -85,11 +85,11 @@ if (
   // ===============================
   if (ledger.source === "PLAN_EARLY_WITHDRAW") {
 
-    const { completeEarlyWithdrawInternal } = await import(
+    const { completeEarlyWithdraw } = await import(
       "../withdrawEarly/earlyWithdrawController.js"
     );
 
-    await completeEarlyWithdrawInternal(reference);
+    await completeEarlyWithdraw(reference);
 
     await ActivityLog.findOneAndUpdate(
       { reference },
