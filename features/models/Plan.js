@@ -61,7 +61,8 @@ const planSchema = new mongoose.Schema(
 
     nextRunAt: {
       type: Date,
-      required: true
+      required: false,
+      default: null,
     },
 
     missedCount: {
