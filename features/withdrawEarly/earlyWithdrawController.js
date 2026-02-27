@@ -200,8 +200,11 @@ if (isDev) {
     }
 
 
-
+ if (isDev) {
 console.log("DEBUG userId:", userId);
+ }
+
+
 
   // 3️⃣ Balance check
     if (plan.balance < totalDebit) {
