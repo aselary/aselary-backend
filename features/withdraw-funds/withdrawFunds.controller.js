@@ -15,6 +15,8 @@ import { initiatePaystackTransfer } from "../transfer/initiateTransfer.js";
 import isDev from "../utils/isDev.js";
 import { paystackRequest }from "../utils/paystack.js";
 import Plan from "../models/Plan.js";
+import TransferOTP from "../models/transferOtpModel.js";
+import { sendEmail } from "../../config/mailer.js";
 
 export const withdrawFunds = async (req, res) => {
     const session = await mongoose.startSession();
@@ -385,18 +387,98 @@ if (init.requiresOtp) {
     { session }
   );
 
+   // 🔐 Generate OUR own OTP for user
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  
+  // Save OTP
+  await TransferOTP.create({
+    userId,
+    reference,
+    otp,
+    expiresAt,
+    used: false
+  });
+  
+  // Send OTP to user email
+  await sendEmail({
+    to: req.user.email,
+    subject: "Confirm your withdrawal",
+   html: `
+  <div style="margin:0;padding:0;background:#0b0f1a;font-family:Arial,Helvetica,sans-serif;">
+    <div style="max-width:520px;margin:40px auto;background:#111827;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.05);">
+  
+      <!-- HEADER -->
+      <div style="background:linear-gradient(135deg,#0ea5e9,#6366f1);padding:25px;text-align:center;">
+        <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:1px;">
+          🔐 Secure Withdrawal Confirmation
+        </h1>
+        <p style="color:#e0e7ff;margin-top:6px;font-size:13px;">
+          Verify your transaction
+        </p>
+      </div>
+  
+      <!-- BODY -->
+      <div style="padding:30px;color:#e5e7eb;text-align:center;">
+  
+        <p style="font-size:15px;margin-bottom:20px;">
+          Use the secure OTP below to confirm your withdrawal.
+        </p>
+  
+        <!-- OTP BOX -->
+        <div style="
+          font-size:38px;
+          letter-spacing:8px;
+          font-weight:bold;
+          color:#0ea5e9;
+          background:#020617;
+          padding:18px 25px;
+          border-radius:12px;
+          display:inline-block;
+          border:1px solid rgba(14,165,233,0.4);
+          box-shadow:0 0 20px rgba(14,165,233,0.2);
+          margin-bottom:20px;
+        ">
+          ${otp}
+        </div>
+  
+        <p style="font-size:13px;color:#9ca3af;margin-top:10px;">
+          This OTP expires in <b>10 minutes</b>.
+        </p>
+  
+        <div style="margin-top:25px;padding:15px;background:#020617;border-radius:10px;border:1px solid rgba(255,255,255,0.05);">
+          <p style="font-size:12px;color:#9ca3af;margin:0;">
+            ⚠️ Never share this code with anyone.<br/>
+            Our team will never ask for your OTP.
+          </p>
+        </div>
+  
+      </div>
+  
+      <!-- FOOTER -->
+      <div style="padding:18px;text-align:center;background:#020617;color:#6b7280;font-size:11px;">
+        © ${new Date().getFullYear()} Aselary Secure System  
+        <br/>Protected Financial Environment
+      </div>
+  
+    </div>
+  </div>
+  `
+  });
+
   await session.commitTransaction();
   session.endSession();
 
-  // ⛔ ABSOLUTE STOP
-  return res.status(200).json({
-    success: true,
-    message: "OTP required to complete transfer",
-    data: {
-      reference,
-      requiresOtp: true,
-    },
-  });
+  // 🔴 ABSOLUTE STOP
+return res.status(200).json({
+  success: true,
+  otpRequired: true,
+  message: "Please check your email for the OTP to complete this withdrawal",
+  data: {
+    reference,
+    requiresOtp: true,
+  },
+});
 }
 
     // 9️⃣ Commit
@@ -745,6 +827,18 @@ export const verifyWithdrawFundOtp = async (req, res) => {
     // 1️⃣ Find transaction
     const wf = await ToBankTransaction.findOne({ reference });
 
+    if (String(wf.userId) !== String(req.user._id)) {
+  return res.status(403).json({
+    message: "Unauthorized transaction"
+  });
+}
+
+if (wf.isFinalized) {
+  return res.status(400).json({
+    message: "Transaction already completed"
+  });
+}
+
     if (!wf) {
       return res.status(404).json({
         message: "Transaction not found",
@@ -783,6 +877,7 @@ export const verifyWithdrawFundOtp = async (req, res) => {
     // 4️⃣ Mark OTP verified
     wf.status = "OTP_VERIFIED";
     wf.otpVerifiedAt = new Date();
+    wf.isFinalized = true
     await wf.save();
 
     return res.json({
