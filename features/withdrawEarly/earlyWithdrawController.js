@@ -230,9 +230,9 @@ try {
 
     // 🔐 Generate OUR own OTP for user
 const otp = Math.floor(100000 + Math.random() * 900000).toString();
-if (isDev) {
+
 console.log("✅ OTP GENERATED:", otp);
-}
+
 const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
 
