@@ -458,7 +458,9 @@ await Transaction.create(
   await session.commitTransaction();
   session.endSession();
 
+  if (isDev) {
   console.log("🛑 STOPPING BEFORE PAYSTACK. WAITING FOR OTP VERIFY");
+  }
   // ⛔ ABSOLUTE STOP
   return res.status(200).json({
     success: true,
@@ -804,64 +806,79 @@ export const failEarlyWithdraw = async (req, res) => {
 
 
 export const verifyEarlyWithdrawOtp = async (req, res) => {
+  console.log("🚀 VERIFY OTP CONTROLLER HIT");
 
   const { reference, otp } = req.body;
 
-  console.log("📩 VERIFY OTP REQUEST:", { reference, otp });
+  console.log("📥 REQUEST BODY:", { reference, otp });
 
   if (!reference || !otp) {
+    console.log("❌ Missing reference or otp");
     return res.status(400).json({
       message: "Reference and OTP are required",
     });
   }
 
   try {
+    console.log("🔍 Searching transaction with reference:", reference);
+
     // 1️⃣ Find transaction
     const ew = await ToBankTransaction.findOne({ reference });
-     
-    if (isDev) {
-    console.log("💳 TRANSACTION FOUND:", ew?.status);
-    }
+
+    console.log("📦 Transaction found:", ew);
 
     if (!ew) {
+      console.log("❌ Transaction NOT found");
       return res.status(404).json({
         message: "Transaction not found",
       });
     }
 
-    // 2️⃣ Guard: must be waiting for OTP
+    console.log("📊 Transaction status:", ew.status);
+
+    // 2️⃣ Must be waiting OTP
     if (ew.status !== "OTP_REQUIRED") {
+      console.log("❌ Transaction not waiting for OTP");
       return res.status(400).json({
         message: "Transaction not awaiting OTP",
       });
     }
 
+    console.log("🔍 Searching OTP record...");
 
-    
-   const otpRecord = await TransferOTP.findOne({
- reference,
- otp,
- used: false,
- expiresAt: { $gt: new Date() }
-});
+    // 3️⃣ Find OTP
+    const otpRecord = await TransferOTP.findOne({
+      reference,
+      otp,
+      used: false,
+      expiresAt: { $gt: new Date() },
+    });
 
-if (!otpRecord) {
- return res.status(400).json({
-   message: "Invalid or expired OTP"
- });
-}
+    console.log("📨 OTP record result:", otpRecord);
 
-otpRecord.used = true;
-await otpRecord.save();
-    // 4️⃣ Mark OTP verified
+    if (!otpRecord) {
+      console.log("❌ OTP invalid or expired");
+      return res.status(400).json({
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    console.log("✅ OTP VALID. Marking used...");
+
+    // 4️⃣ Mark OTP used
+    otpRecord.used = true;
+    await otpRecord.save();
+
+    console.log("✅ OTP marked used");
+
+    // 5️⃣ Mark transaction verified
     ew.status = "OTP_VERIFIED";
     ew.otpVerifiedAt = new Date();
+
     await ew.save();
 
-
-     if (isDev) {
-    console.log("🔐 OTP RECORD FOUND:", otpRecord);
-     }
+    console.log("🎉 OTP VERIFIED SUCCESSFULLY");
+    console.log("📊 Updated transaction:", ew);
 
     return res.json({
       success: true,
@@ -870,9 +887,7 @@ await otpRecord.save();
     });
 
   } catch (error) {
-    if (isDev) {
-    console.error("VERIFY TO BANK OTP ERROR:", error);
-    }
+    console.error("💥 VERIFY OTP FATAL ERROR:", error);
 
     return res.status(500).json({
       message: error.message || "Internal server error",
