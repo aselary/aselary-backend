@@ -12,7 +12,6 @@ import { getDailyTransferTotal } from "../utils/getDailyTransferTotal.js";
 import { createTransferRecipient } from "../transfer/createRecipient.js";
 import { initiatePaystackTransfer } from "../transfer/initiateTransfer.js";
 import isDev from "../utils/isDev.js";
-import { paystackRequest }from "../utils/paystack.js";
 import { calculateEarlyWithdrawalPenalty } from "../utils/calculateEarlyWithdrawalPenalty.js";
 import TransferOTP from "../models/transferOtpModel.js";
 import { sendEmail } from "../../config/mailer.js";
@@ -263,7 +262,7 @@ await TransferOTP.create({
 
 // Send OTP to user email
 await sendEmail({
-  to: req.user.email,
+  to: email,
   subject: "Confirm your withdrawal",
  html: `
 <div style="margin:0;padding:0;background:#0b0f1a;font-family:Arial,Helvetica,sans-serif;">
