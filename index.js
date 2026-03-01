@@ -207,7 +207,7 @@ mongoose
 
   const schedule = isProd
     ? "* * * * *"
-    : "*/5 * * * * *";
+    : "*/3 * * * * *";
 
   cron.schedule(schedule, async () => {
     if (isDev) {

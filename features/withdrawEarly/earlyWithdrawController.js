@@ -230,7 +230,9 @@ try {
 
     // 🔐 Generate OUR own OTP for user
 const otp = Math.floor(100000 + Math.random() * 900000).toString();
+if (isDev) {
 console.log("✅ OTP GENERATED:", otp);
+}
 const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
 
@@ -261,15 +263,19 @@ await TransferOTP.create({
   expiresAt,
   used: false
 });
-
+  
+    if (isDev) {
   console.log("✅ OTP SAVED TO DB");
+    }
 
  const user = await User.findById(userId).select("email");
 if (!user) throw new Error("User not found");
 
 const email = user.email;
 
+if (isDev) {
 console.log("📩 ABOUT TO SEND EMAIL TO:", email);
+}
 
 
 
@@ -340,9 +346,13 @@ try {
 `
 });
 
+if (isDev) {
  console.log("📬 EMAIL SENT RESULT:", info);
+}
 } catch (mailErr) {
+  if (isDev) {
   console.log("❌ EMAIL FAILED:", mailErr.message);
+  }s
 }
 
 if (isDev) {
@@ -808,9 +818,10 @@ export const verifyEarlyWithdrawOtp = async (req, res) => {
   try {
     // 1️⃣ Find transaction
     const ew = await ToBankTransaction.findOne({ reference });
-
+     
+    if (isDev) {
     console.log("💳 TRANSACTION FOUND:", ew?.status);
-    console.log("💳 TRANSFER CODE:", ew?.transferCode);
+    }
 
     if (!ew) {
       return res.status(404).json({
@@ -825,12 +836,6 @@ export const verifyEarlyWithdrawOtp = async (req, res) => {
       });
     }
 
-
-    if (!ew.transferCode) {
-      return res.status(400).json({
-        message: "Missing transfer code",
-      });
-    }
 
     
    const otpRecord = await TransferOTP.findOne({
@@ -853,7 +858,10 @@ await otpRecord.save();
     ew.otpVerifiedAt = new Date();
     await ew.save();
 
+
+     if (isDev) {
     console.log("🔐 OTP RECORD FOUND:", otpRecord);
+     }
 
     return res.json({
       success: true,
