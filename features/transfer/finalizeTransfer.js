@@ -1,28 +1,27 @@
-import isDev from "../utils/isDev.js";
-import TransferOTP from "../models/transferOtpModel.js";
+import paystackFetch from "../utils/paystackFetch.js";
 
-export const finalizePaystackTransfer = async ({ transferCode, otp }) => {
+export const finalizePaystackTransfer = async ({ transferCode }) => {
 
-  // 🔐 STEP 1 — VERIFY OUR OWN OTP
-  const otpRecord = await TransferOTP.findOne({
-    otp: otp,
-    used: false,
-    expiresAt: { $gt: new Date() }
+  if (!transferCode) {
+    throw new Error("Transfer code missing");
+  }
+
+  // 🔵 CALL PAYSTACK FINALIZE
+  const response = await paystackFetch("/transfer/finalize_transfer", {
+    method: "POST",
+    body: {
+      transfer_code: transferCode
+    }
   });
 
-  if (!otpRecord) {
-    throw new Error("Invalid or expired OTP");
+  if (!response.data.status) {
+    throw new Error(response.data.message || "Transfer failed");
   }
 
-
-  // 💥 OUR SYSTEM CONTROLS FINAL SUCCESS
-return {
-  status: "success",
-  transferCode,
-  completedAt: new Date().toISOString(),
-  raw: {
+  return {
     status: "success",
-    message: "Withdrawal completed successfully"
-  }
-};
+    transferCode,
+    completedAt: new Date().toISOString(),
+    raw: response.data
+  };
 };
