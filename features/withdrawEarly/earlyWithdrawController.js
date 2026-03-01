@@ -249,6 +249,7 @@ try {
 
     // 🔐 Generate OUR own OTP for user
 const otp = Math.floor(100000 + Math.random() * 900000).toString();
+console.log("✅ OTP GENERATED:", otp);
 const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
 // Save OTP
@@ -260,6 +261,9 @@ await TransferOTP.create({
   used: false
 });
 
+  console.log("✅ OTP SAVED TO DB");
+
+  console.log("📩 ABOUT TO SEND EMAIL TO:", email);
 // Send OTP to user email
 await sendEmail({
   to: email,
