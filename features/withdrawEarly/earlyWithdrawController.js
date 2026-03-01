@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Ledger from "../models/Ledger.js";
+import User from "../models/User.js";
 import ToBankTransaction from "../models/ToBankTransaction.js";
 import ActivityLog from "../models/ActivityLog.js";
 import Transaction from "../models/Transaction.js";
@@ -25,7 +26,6 @@ export const earlyWithdraw = async (req, res) => {
       amount,
       narration,
       planId,
-      email,
     } = req.body;
 
      if (isDev) {
@@ -263,7 +263,15 @@ await TransferOTP.create({
 
   console.log("✅ OTP SAVED TO DB");
 
-  console.log("📩 ABOUT TO SEND EMAIL TO:", email);
+ const user = await User.findById(userId).select("email");
+if (!user) throw new Error("User not found");
+
+const email = user.email;
+
+console.log("📩 ABOUT TO SEND EMAIL TO:", email);
+
+
+
 // Send OTP to user email
 await sendEmail({
   to: email,
