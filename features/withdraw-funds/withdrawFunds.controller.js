@@ -369,17 +369,6 @@ await Transaction.create(
   { session }
 );
 
-if (init.requiresOtp) {
-  // 1️⃣ Update ONLY what is needed for OTP
-  await ToBankTransaction.findOneAndUpdate(
-    { reference },
-    {
-      status: "OTP_REQUIRED",
-      transferCode: init.transferCode,
-      requiresOtp: true,
-    },
-    { session }
-  );
 
   await ActivityLog.findOneAndUpdate(
     { reference },
@@ -478,7 +467,7 @@ return res.status(200).json({
     requiresOtp: true,
   },
 });
-}
+
 
     // 9️⃣ Commit
     await session.commitTransaction();
@@ -881,7 +870,7 @@ if (wf.isFinalized) {
 
     return res.json({
       success: true,
-      message: "OTP verified successfully",
+    message: "OTP verified. Processing withdrawal...",
       reference,
     });
 

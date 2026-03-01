@@ -359,17 +359,10 @@ await Transaction.create(
   { session }
 );
 
-if (init.requiresOtp) {
-  // 1️⃣ Update ONLY what is needed for OTP
-  await ToBankTransaction.findOneAndUpdate(
-    { reference },
-    {
-      status: "OTP_REQUIRED",
-      transferCode: init.transferCode,
-      requiresOtp: true,
-    },
-    { session }
-  );
+
+
+
+ 
 
   await ActivityLog.findOneAndUpdate(
     { reference },
@@ -377,8 +370,7 @@ if (init.requiresOtp) {
     { session }
   );
 
-
-  // 🔐 Generate OUR own OTP for user
+    // 🔐 Generate OUR own OTP for user
 const otp = Math.floor(100000 + Math.random() * 900000).toString();
 const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -457,6 +449,7 @@ await sendEmail({
 `
 });
 
+
   await session.commitTransaction();
   session.endSession();
 
@@ -469,7 +462,7 @@ await sendEmail({
       requiresOtp: true,
     },
   });
-}
+
 
     // 9️⃣ Commit
     await session.commitTransaction();
@@ -857,7 +850,7 @@ export const verifyEarlyWithdrawOtp = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "OTP verified successfully",
+      message: "OTP verified. Processing withdrawal...",
       reference,
     });
 
