@@ -248,6 +248,85 @@ try {
   { session }
 );
 
+    // 🔐 Generate OUR own OTP for user
+const otp = Math.floor(100000 + Math.random() * 900000).toString();
+const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+// Save OTP
+await TransferOTP.create({
+  userId,
+  reference,
+  otp,
+  expiresAt,
+  used: false
+});
+
+// Send OTP to user email
+await sendEmail({
+  to: req.user.email,
+  subject: "Confirm your withdrawal",
+ html: `
+<div style="margin:0;padding:0;background:#0b0f1a;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:520px;margin:40px auto;background:#111827;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.05);">
+
+    <!-- HEADER -->
+    <div style="background:linear-gradient(135deg,#0ea5e9,#6366f1);padding:25px;text-align:center;">
+      <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:1px;">
+        🔐 Secure Withdrawal Confirmation
+      </h1>
+      <p style="color:#e0e7ff;margin-top:6px;font-size:13px;">
+        Verify your transaction
+      </p>
+    </div>
+
+    <!-- BODY -->
+    <div style="padding:30px;color:#e5e7eb;text-align:center;">
+
+      <p style="font-size:15px;margin-bottom:20px;">
+        Use the secure OTP below to confirm your withdrawal.
+      </p>
+
+      <!-- OTP BOX -->
+      <div style="
+        font-size:38px;
+        letter-spacing:8px;
+        font-weight:bold;
+        color:#0ea5e9;
+        background:#020617;
+        padding:18px 25px;
+        border-radius:12px;
+        display:inline-block;
+        border:1px solid rgba(14,165,233,0.4);
+        box-shadow:0 0 20px rgba(14,165,233,0.2);
+        margin-bottom:20px;
+      ">
+        ${otp}
+      </div>
+
+      <p style="font-size:13px;color:#9ca3af;margin-top:10px;">
+        This OTP expires in <b>10 minutes</b>.
+      </p>
+
+      <div style="margin-top:25px;padding:15px;background:#020617;border-radius:10px;border:1px solid rgba(255,255,255,0.05);">
+        <p style="font-size:12px;color:#9ca3af;margin:0;">
+          ⚠️ Never share this code with anyone.<br/>
+          Our team will never ask for your OTP.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div style="padding:18px;text-align:center;background:#020617;color:#6b7280;font-size:11px;">
+      © ${new Date().getFullYear()} Aselary Secure System  
+      <br/>Protected Financial Environment
+    </div>
+
+  </div>
+</div>
+`
+});
+
 
 if (isDev) {
 console.log("🔥 RECIPIENT PAYLOAD", {
@@ -256,24 +335,6 @@ console.log("🔥 RECIPIENT PAYLOAD", {
   bankCode,
 });
 }
-
-
-const recipientCode = await createTransferRecipient({
-  name: accountName,
-  accountNumber,
-  bankCode,
-});
-
-if (!recipientCode) {
-  throw new Error("Failed to create Paystack recipient");
-}
-
- const init = await initiatePaystackTransfer({
-  amount,
-  recipientCode,
-  reference,
-  reason: narration,
-});
 
   if (isDev) {
 console.log("📒 STEP 6: Creating ActivityLog...");
@@ -365,85 +426,6 @@ await Transaction.create(
     { status: "PENDING" },
     { session }
   );
-
-    // 🔐 Generate OUR own OTP for user
-const otp = Math.floor(100000 + Math.random() * 900000).toString();
-const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-// Save OTP
-await TransferOTP.create({
-  userId,
-  reference,
-  otp,
-  expiresAt,
-  used: false
-});
-
-// Send OTP to user email
-await sendEmail({
-  to: req.user.email,
-  subject: "Confirm your withdrawal",
- html: `
-<div style="margin:0;padding:0;background:#0b0f1a;font-family:Arial,Helvetica,sans-serif;">
-  <div style="max-width:520px;margin:40px auto;background:#111827;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.05);">
-
-    <!-- HEADER -->
-    <div style="background:linear-gradient(135deg,#0ea5e9,#6366f1);padding:25px;text-align:center;">
-      <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:1px;">
-        🔐 Secure Withdrawal Confirmation
-      </h1>
-      <p style="color:#e0e7ff;margin-top:6px;font-size:13px;">
-        Verify your transaction
-      </p>
-    </div>
-
-    <!-- BODY -->
-    <div style="padding:30px;color:#e5e7eb;text-align:center;">
-
-      <p style="font-size:15px;margin-bottom:20px;">
-        Use the secure OTP below to confirm your withdrawal.
-      </p>
-
-      <!-- OTP BOX -->
-      <div style="
-        font-size:38px;
-        letter-spacing:8px;
-        font-weight:bold;
-        color:#0ea5e9;
-        background:#020617;
-        padding:18px 25px;
-        border-radius:12px;
-        display:inline-block;
-        border:1px solid rgba(14,165,233,0.4);
-        box-shadow:0 0 20px rgba(14,165,233,0.2);
-        margin-bottom:20px;
-      ">
-        ${otp}
-      </div>
-
-      <p style="font-size:13px;color:#9ca3af;margin-top:10px;">
-        This OTP expires in <b>10 minutes</b>.
-      </p>
-
-      <div style="margin-top:25px;padding:15px;background:#020617;border-radius:10px;border:1px solid rgba(255,255,255,0.05);">
-        <p style="font-size:12px;color:#9ca3af;margin:0;">
-          ⚠️ Never share this code with anyone.<br/>
-          Our team will never ask for your OTP.
-        </p>
-      </div>
-
-    </div>
-
-    <!-- FOOTER -->
-    <div style="padding:18px;text-align:center;background:#020617;color:#6b7280;font-size:11px;">
-      © ${new Date().getFullYear()} Aselary Secure System  
-      <br/>Protected Financial Environment
-    </div>
-
-  </div>
-</div>
-`
-});
 
 
   await session.commitTransaction();
@@ -577,6 +559,28 @@ export const completeEarlyWithdraw = async (req, res) => {
     if (plan.balance < totalDebit) {
       throw new Error("Insufficient balance");
     }
+
+    const recipientCode = await createTransferRecipient({
+  name: ew.accountName,
+  accountNumber: ew.accountNumber,
+  bankCode: ew.bankCode,
+});
+
+if (!recipientCode) {
+  throw new Error("Recipient creation failed");
+}
+
+const paystack = await initiatePaystackTransfer({
+  amount: ew.amount,
+  recipientCode,
+  reference,
+  reason: ew.narration,
+});
+
+if (!paystack || paystack.status !== "success") {
+  throw new Error("Transfer failed from Paystack");
+}
+
 
     
     plan.balance -= totalDebit;
