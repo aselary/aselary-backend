@@ -360,10 +360,6 @@ await Transaction.create(
 );
 
 
-
-
- 
-
   await ActivityLog.findOneAndUpdate(
     { reference },
     { status: "PENDING" },
@@ -826,23 +822,21 @@ export const verifyEarlyWithdrawOtp = async (req, res) => {
     }
 
     
-    // 3️⃣ Call Paystack to finalize transfer
-    const response = await paystackRequest(
-      "/transfer/finalize_transfer",
-      "POST",
-      {
-        transfer_code: ew.transferCode,
-        otp,
-      }
-    );
+   const otpRecord = await TransferOTP.findOne({
+ reference,
+ otp,
+ used: false,
+ expiresAt: { $gt: new Date() }
+});
 
+if (!otpRecord) {
+ return res.status(400).json({
+   message: "Invalid or expired OTP"
+ });
+}
 
-    if (!response?.data?.status) {
-      return res.status(400).json({
-        message: "OTP verification failed",
-      });
-    }
-
+otpRecord.used = true;
+await otpRecord.save();
     // 4️⃣ Mark OTP verified
     ew.status = "OTP_VERIFIED";
     ew.otpVerifiedAt = new Date();
