@@ -472,7 +472,6 @@ if (init.requiresOtp) {
   // 🔴 ABSOLUTE STOP
 return res.status(200).json({
   success: true,
-  otpRequired: true,
   message: "Please check your email for the OTP to complete this withdrawal",
   data: {
     reference,

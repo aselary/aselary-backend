@@ -25,7 +25,8 @@ export const earlyWithdraw = async (req, res) => {
     const {
       amount,
       narration,
-      planId
+      planId,
+      email,
     } = req.body;
 
      if (isDev) {
@@ -459,16 +460,15 @@ await sendEmail({
   await session.commitTransaction();
   session.endSession();
 
- // 🔴 ABSOLUTE STOP
-return res.status(200).json({
-  success: true,
-  otpRequired: true,
-  message: "Please check your email for the OTP to complete this withdrawal",
-  data: {
-    reference,
-    requiresOtp: true,
-  },
-});
+  // ⛔ ABSOLUTE STOP
+  return res.status(200).json({
+    success: true,
+    message: "Please check your email for the OTP to complete", 
+    data: {
+      reference,
+      requiresOtp: true,
+    },
+  });
 }
 
     // 9️⃣ Commit
