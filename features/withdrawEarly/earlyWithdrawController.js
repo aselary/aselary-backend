@@ -797,6 +797,8 @@ export const verifyEarlyWithdrawOtp = async (req, res) => {
 
   const { reference, otp } = req.body;
 
+  console.log("📩 VERIFY OTP REQUEST:", { reference, otp });
+
   if (!reference || !otp) {
     return res.status(400).json({
       message: "Reference and OTP are required",
@@ -806,6 +808,9 @@ export const verifyEarlyWithdrawOtp = async (req, res) => {
   try {
     // 1️⃣ Find transaction
     const ew = await ToBankTransaction.findOne({ reference });
+
+    console.log("💳 TRANSACTION FOUND:", ew?.status);
+    console.log("💳 TRANSFER CODE:", ew?.transferCode);
 
     if (!ew) {
       return res.status(404).json({
@@ -847,6 +852,8 @@ await otpRecord.save();
     ew.status = "OTP_VERIFIED";
     ew.otpVerifiedAt = new Date();
     await ew.save();
+
+    console.log("🔐 OTP RECORD FOUND:", otpRecord);
 
     return res.json({
       success: true,
