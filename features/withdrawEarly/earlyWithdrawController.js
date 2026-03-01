@@ -264,7 +264,9 @@ const savedOtp = await TransferOTP.create([{
   used: false
 }], { session });
 
+if (isDev) {
 console.log("🔥 OTP SAVED:", savedOtp);
+}
   
     if (isDev) {
   console.log("✅ OTP SAVED TO DB");
@@ -846,17 +848,18 @@ export const verifyEarlyWithdrawOtp = async (req, res) => {
       });
     }
 
-    console.log("🔍 Searching OTP record...");
+   console.log("🔎 Searching OTP with:", {
+  reference,
+  otp
+});
 
-    // 3️⃣ Find OTP
-    const otpRecord = await TransferOTP.findOne({
-      reference,
-      otp,
-      used: false,
-      expiresAt: { $gt: new Date() },
-    });
+const otpRecord = await TransferOTP.findOne({
+  reference: reference.trim(),
+  otp: String(otp).trim(),
+  used: false
+});
 
-    console.log("📨 OTP record result:", otpRecord);
+console.log("📦 OTP record result:", otpRecord);
 
     if (!otpRecord) {
       console.log("❌ OTP invalid or expired");
