@@ -14,21 +14,6 @@ export const finalizePaystackTransfer = async ({ transferCode, otp }) => {
     throw new Error("Invalid or expired OTP");
   }
 
-  // 🧪 DEV MODE (LOCAL TEST)
-  if (isDev) {
-    otpRecord.used = true;
-    await otpRecord.save();
-
-    return {
-      status: "success",
-      transferCode,
-      completedAt: new Date().toISOString(),
-      raw: {
-        status: "success",
-        message: "Mock transfer successful (DEV MODE)"
-      }
-    };
-  }
 
   // 💥 OUR SYSTEM CONTROLS FINAL SUCCESS
 return {

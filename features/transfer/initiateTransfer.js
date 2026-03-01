@@ -1,4 +1,4 @@
-import isDev from "../utils/isDev.js";
+
 import { paystackFetch } from "../services/paystack.js";
 
 export const initiatePaystackTransfer = async ({
@@ -7,18 +7,7 @@ export const initiatePaystackTransfer = async ({
   reference,
   reason,
 }) => {
-  // ✅ MOCK FOR DEV
-  if (isDev) {
-    return {
-      status: "success",
-      transferCode: "MOCK_TRF_" + Date.now(),
-      requiresOtp: false,
-      raw: {
-        status: "success",
-        message: "Mock transfer successful",
-      },
-    };
-  }
+ 
 
   // 🔴 REAL PAYSTACK (PRODUCTION ONLY)
   const response = await paystackFetch("/transfer", {

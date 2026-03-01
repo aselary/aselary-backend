@@ -4,6 +4,7 @@ import isDev from "../utils/isDev.js";
 
 export async function securityGuard(req, res, next) {
   try {
+
     // ✅ BYPASS security checks for resolve endpoints
     if (
       req.path.includes("/to-bank/complete") ||
@@ -67,16 +68,25 @@ await FraudLog.create({
 const DEV_USER = "6973d7c5a583cada6f591822"; // put your Mongo user id
 
 if (req.user && req.user.id === DEV_USER) {
+  if (isDev) {
  console.log("🟢 DEV BYPASS ACTIVE");
+  }
  return next();
 }
 
-// 🚫 BLOCK very high risk
+console.log("🛑 SECURITY BLOCK CHECK");
+console.log("riskResult:", riskResult);
+console.log("blocked:", riskResult?.blocked);
+console.log("score:", riskResult?.score);
+console.log("reference:", req.body.reference);
+console.log("user:", req.user?.id);
+
 if (riskResult.blocked && !req.body.reference) {
- return res.status(403).json({
-  success:false,
-  message: riskResult.reason || "High risk action blocked"
- });
+  console.log("🚨🚨🚨 403 TRIGGERED HERE 🚨🚨🚨");
+  return res.status(403).json({
+    success:false,
+    message: riskResult.reason || "High risk action blocked"
+  });
 }
 
 // ⚠️ THROTTLE medium risk

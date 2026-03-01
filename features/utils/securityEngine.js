@@ -1,26 +1,43 @@
 export function calculateRisk({
   amount,
-  userId,
   ip,
   userAgent,
   attempts,
 }) {
+
   let score = 0;
 
-  // =========================
-  // HARD AMOUNT RULES (BLOCK)
-  // =========================
-  if (!amount || isNaN(amount)) {
-    return { blocked: true, reason: "Invalid amount", score: 100 };
-  }
+ /* =========================
+   AMOUNT VALIDATION
+========================= */
 
-  if (amount < 100) {
-    return { blocked: true, reason: "Amount below minimum", score: 100 };
-  }
+// invalid amount only
+if (!amount || isNaN(amount)) {
+  return { blocked: true, reason: "Invalid amount", score: 100 };
+}
 
-  if (amount > 1_000_000) {
-    return { blocked: true, reason: "Amount exceeds limit", score: 100 };
-  }
+/* =========================
+   OWNER FREEDOM RULE
+   user can withdraw ANY amount
+========================= */
+
+// we DO NOT block small amount
+if (amount < 50) {
+  score += 5; 
+  reason = "Very small withdrawal";
+}
+
+// medium monitoring only
+if (amount > 500000) {
+  score += 10;
+  reason = "Large withdrawal";
+}
+
+// very large monitoring
+if (amount > 2000000) {
+  score += 25;
+  reason = "Very large withdrawal";
+}
 
   // =========================
   // RISK SCORING (VERSION 1)

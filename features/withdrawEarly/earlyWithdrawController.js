@@ -228,8 +228,13 @@ try {
  console.log("📌 STEP 3 RESULT: existing =", existing);
  }
 
+    // 🔐 Generate OUR own OTP for user
+const otp = Math.floor(100000 + Math.random() * 900000).toString();
+console.log("✅ OTP GENERATED:", otp);
+const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    const earlyWihtdrawTxn = await ToBankTransaction.create(
+
+   await ToBankTransaction.create(
   [{
     userId,
     planId: plan._id,
@@ -242,15 +247,11 @@ try {
     accountNumber,
     accountName,
     reference,
-    status: "PENDING",
+    status: "OTP_REQUIRED",
   }],
   { session }
 );
 
-    // 🔐 Generate OUR own OTP for user
-const otp = Math.floor(100000 + Math.random() * 900000).toString();
-console.log("✅ OTP GENERATED:", otp);
-const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
 // Save OTP
 await TransferOTP.create({
@@ -273,7 +274,8 @@ console.log("📩 ABOUT TO SEND EMAIL TO:", email);
 
 
 // Send OTP to user email
-await sendEmail({
+try {
+  const info = await sendEmail({
   to: email,
   subject: "Confirm your withdrawal",
  html: `
@@ -338,6 +340,10 @@ await sendEmail({
 `
 });
 
+ console.log("📬 EMAIL SENT RESULT:", info);
+} catch (mailErr) {
+  console.log("❌ EMAIL FAILED:", mailErr.message);
+}
 
 if (isDev) {
 console.log("🔥 RECIPIENT PAYLOAD", {
@@ -442,33 +448,18 @@ await Transaction.create(
   await session.commitTransaction();
   session.endSession();
 
+  console.log("🛑 STOPPING BEFORE PAYSTACK. WAITING FOR OTP VERIFY");
   // ⛔ ABSOLUTE STOP
   return res.status(200).json({
     success: true,
     message: "Please check your email for the OTP to complete", 
+    requiresOtp: true,
     data: {
       reference,
       requiresOtp: true,
     },
   });
 
-
-    // 9️⃣ Commit
-    await session.commitTransaction();
-    session.endSession();
-
-    return res.status(200).json({
-      success: true,
-      message: "Transfer initiated",
-      data: {
-        reference,
-        narration,
-        amount,
-        status: "PENDING",
-        createdAt: earlyWihtdrawTxn.createdAt,
-        updatedAt: earlyWihtdrawTxn.updatedAt,
-      },
-    });
    } catch (error) {
 
    if (isDev) {
