@@ -255,14 +255,15 @@ const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 );
 
 
-// Save OTP
-const savedOtp = await TransferOTP.create({
+const savedOtpArr = await TransferOTP.create([{
   userId,
   reference,
-  otp,
+  otp: String(otp).trim(),
   expiresAt,
   used: false
-}, { session });
+}], { session });
+
+const savedOtp = savedOtpArr[0]; // get real object
 
 if (isDev) {
 console.log("🔥 OTP SAVED:", savedOtp);
