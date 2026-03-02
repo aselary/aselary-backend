@@ -849,27 +849,30 @@ export const verifyEarlyWithdrawOtp = async (req, res) => {
       });
     }
 
-   console.log("🔎 Searching OTP with:", {
-  reference,
-  otp
-});
+console.log("🔍 Searching OTP with:", { reference, otp });
 
 const otpRecord = await TransferOTP.findOne({
   reference: reference.trim(),
-  otp: String(otp).trim(),
   used: false
 });
 
-console.log("📦 OTP record result:", otpRecord);
+console.log("📄 OTP record result:", otpRecord);
 
-    if (!otpRecord) {
-      console.log("❌ OTP invalid or expired");
-      return res.status(400).json({
-        message: "Invalid or expired OTP",
-      });
-    }
+if (!otpRecord) {
+  console.log("❌ OTP not found");
+  return res.status(400).json({
+    message: "Invalid or expired OTP"
+  });
+}
 
-    console.log("✅ OTP VALID. Marking used...");
+if (String(otpRecord.otp).trim() !== String(otp).trim()) {
+  console.log("❌ Incorrect OTP entered");
+  return res.status(400).json({
+    message: "Incorrect OTP"
+  });
+}
+
+console.log("✅ OTP VALID. Marking used...");
 
     // 4️⃣ Mark OTP used
     otpRecord.used = true;
