@@ -255,13 +255,13 @@ const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 );
 
 
-const savedOtpArr = await TransferOTP.create([{
+ await TransferOTP.create({
   userId,
   reference,
   otp: String(otp).trim(),
   expiresAt,
   used: false
-}], { session });
+});
 
 const savedOtp = savedOtpArr[0]; // get real object
 
