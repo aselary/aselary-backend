@@ -84,7 +84,7 @@ console.log("reference:", req.body.reference);
 console.log("user:", req.user?.id);
  }
 
-if (riskResult.blocked && !req.body.reference) {
+if (riskResult.blocked && !req.body.reference && !req.body.otpVerified) {
    if (isDev) {
   console.log("🚨🚨🚨 403 TRIGGERED HERE 🚨🚨🚨");
    }
