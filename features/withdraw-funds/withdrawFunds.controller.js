@@ -13,7 +13,6 @@ import { getDailyTransferTotal } from "../utils/getDailyTransferTotal.js";
 import { createTransferRecipient } from "../transfer/createRecipient.js";
 import { initiatePaystackTransfer } from "../transfer/initiateTransfer.js";
 import isDev from "../utils/isDev.js";
-import { paystackRequest }from "../utils/paystack.js";
 import Plan from "../models/Plan.js";
 import TransferOTP from "../models/transferOtpModel.js";
 import { sendEmail } from "../../config/mailer.js";
@@ -238,6 +237,10 @@ try {
  console.log("📌 STEP 3 RESULT: existing =", existing);
  }
 
+ // 🔐 Generate OUR own OTP for user
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
 
     const withdrawFundTxn = await ToBankTransaction.create(
   [{
@@ -257,6 +260,114 @@ try {
   { session }
 );
 
+
+
+ const savedOtp = await TransferOTP.create({
+  userId,
+  reference,
+  otp: String(otp).trim(),
+  expiresAt,
+  used: false
+});
+
+
+
+if (isDev) {
+console.log("🔥 OTP SAVED:", savedOtp);
+}
+  
+    if (isDev) {
+  console.log("✅ OTP SAVED TO DB");
+    }
+
+ const user = await User.findById(userId).select("email");
+if (!user) throw new Error("User not found");
+
+const email = user.email;
+
+if (isDev) {
+console.log("📩 ABOUT TO SEND EMAIL TO:", email);
+}
+
+
+
+// Send OTP to user email
+try {
+  const info = await sendEmail({
+  to: email,
+  subject: "Confirm your withdrawal",
+ html: `
+<div style="margin:0;padding:0;background:#0b0f1a;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:520px;margin:40px auto;background:#111827;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.05);">
+
+    <!-- HEADER -->
+    <div style="background:linear-gradient(135deg,#0ea5e9,#6366f1);padding:25px;text-align:center;">
+      <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:1px;">
+        🔐 Secure Withdrawal Confirmation
+      </h1>
+      <p style="color:#e0e7ff;margin-top:6px;font-size:13px;">
+        Verify your transaction
+      </p>
+    </div>
+
+    <!-- BODY -->
+    <div style="padding:30px;color:#e5e7eb;text-align:center;">
+
+      <p style="font-size:15px;margin-bottom:20px;">
+        Use the secure OTP below to confirm your withdrawal.
+      </p>
+
+      <!-- OTP BOX -->
+      <div style="
+        font-size:38px;
+        letter-spacing:8px;
+        font-weight:bold;
+        color:#0ea5e9;
+        background:#020617;
+        padding:18px 25px;
+        border-radius:12px;
+        display:inline-block;
+        border:1px solid rgba(14,165,233,0.4);
+        box-shadow:0 0 20px rgba(14,165,233,0.2);
+        margin-bottom:20px;
+      ">
+        ${otp}
+      </div>
+
+      <p style="font-size:13px;color:#9ca3af;margin-top:10px;">
+        This OTP expires in <b>10 minutes</b>.
+      </p>
+
+      <div style="margin-top:25px;padding:15px;background:#020617;border-radius:10px;border:1px solid rgba(255,255,255,0.05);">
+        <p style="font-size:12px;color:#9ca3af;margin:0;">
+          ⚠️ Never share this code with anyone.<br/>
+          Our team will never ask for your OTP.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div style="padding:18px;text-align:center;background:#020617;color:#6b7280;font-size:11px;">
+      © ${new Date().getFullYear()} Aselary Secure System  
+      <br/>Protected Financial Environment
+    </div>
+
+  </div>
+</div>
+`
+});
+
+if (isDev) {
+ console.log("📬 EMAIL SENT RESULT:", info);
+}
+} catch (mailErr) {
+  if (isDev) {
+  console.log("❌ EMAIL FAILED:", mailErr.message);
+  }s
+}
+
+
 if (isDev) {
 console.log("🔥 RECIPIENT PAYLOAD", {
   accountName,
@@ -264,24 +375,6 @@ console.log("🔥 RECIPIENT PAYLOAD", {
   bankCode,
 });
 }
-
-
-const recipientCode = await createTransferRecipient({
-  name: accountName,
-  accountNumber,
-  bankCode,
-});
-
-if (!recipientCode) {
-  throw new Error("Failed to create Paystack recipient");
-}
-
- const init = await initiatePaystackTransfer({
-  amount,
-  recipientCode,
-  reference,
-  reason: narration,
-});
 
 
 
@@ -376,122 +469,34 @@ await Transaction.create(
     { session }
   );
 
-   // 🔐 Generate OUR own OTP for user
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-  
-  // Save OTP
-  await TransferOTP.create({
-    userId,
-    reference,
-    otp,
-    expiresAt,
-    used: false
-  });
-  
-  // Send OTP to user email
-  await sendEmail({
-    to: req.user.email,
-    subject: "Confirm your withdrawal",
-   html: `
-  <div style="margin:0;padding:0;background:#0b0f1a;font-family:Arial,Helvetica,sans-serif;">
-    <div style="max-width:520px;margin:40px auto;background:#111827;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.05);">
-  
-      <!-- HEADER -->
-      <div style="background:linear-gradient(135deg,#0ea5e9,#6366f1);padding:25px;text-align:center;">
-        <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:1px;">
-          🔐 Secure Withdrawal Confirmation
-        </h1>
-        <p style="color:#e0e7ff;margin-top:6px;font-size:13px;">
-          Verify your transaction
-        </p>
-      </div>
-  
-      <!-- BODY -->
-      <div style="padding:30px;color:#e5e7eb;text-align:center;">
-  
-        <p style="font-size:15px;margin-bottom:20px;">
-          Use the secure OTP below to confirm your withdrawal.
-        </p>
-  
-        <!-- OTP BOX -->
-        <div style="
-          font-size:38px;
-          letter-spacing:8px;
-          font-weight:bold;
-          color:#0ea5e9;
-          background:#020617;
-          padding:18px 25px;
-          border-radius:12px;
-          display:inline-block;
-          border:1px solid rgba(14,165,233,0.4);
-          box-shadow:0 0 20px rgba(14,165,233,0.2);
-          margin-bottom:20px;
-        ">
-          ${otp}
-        </div>
-  
-        <p style="font-size:13px;color:#9ca3af;margin-top:10px;">
-          This OTP expires in <b>10 minutes</b>.
-        </p>
-  
-        <div style="margin-top:25px;padding:15px;background:#020617;border-radius:10px;border:1px solid rgba(255,255,255,0.05);">
-          <p style="font-size:12px;color:#9ca3af;margin:0;">
-            ⚠️ Never share this code with anyone.<br/>
-            Our team will never ask for your OTP.
-          </p>
-        </div>
-  
-      </div>
-  
-      <!-- FOOTER -->
-      <div style="padding:18px;text-align:center;background:#020617;color:#6b7280;font-size:11px;">
-        © ${new Date().getFullYear()} Aselary Secure System  
-        <br/>Protected Financial Environment
-      </div>
-  
-    </div>
-  </div>
-  `
-  });
+   
+ 
 
-  await session.commitTransaction();
+   await session.commitTransaction();
   session.endSession();
 
-  // 🔴 ABSOLUTE STOP
-return res.status(200).json({
-  success: true,
-  message: "Please check your email for the OTP to complete this withdrawal",
-  data: {
-    reference,
+  if (isDev) {
+  console.log("🛑 STOPPING BEFORE PAYSTACK. WAITING FOR OTP VERIFY");
+  }
+  // ⛔ ABSOLUTE STOP
+  return res.status(200).json({
+    success: true,
+    message: "Please check your email for the OTP to complete", 
     requiresOtp: true,
-  },
-});
+    data: {
+      reference,
+      requiresOtp: true,
+    },
+  });
 
-
-    // 9️⃣ Commit
-    await session.commitTransaction();
-    session.endSession();
-
-    return res.status(200).json({
-      success: true,
-      message: "Transfer initiated",
-      data: {
-        reference,
-        narration,
-        amount,
-        status: "PENDING",
-        createdAt: withdrawFundTxn.createdAt,
-        updatedAt: withdrawFundTxn.updatedAt,
-      },
-    });
    } catch (error) {
 
    if (isDev) {
-     console.error("🔥 WITHDRAW_FUND CRASHED");
+     console.error("🔥 TO BANK CRASHED");
   console.error("❌ MESSAGE:", error?.message);
   console.error("❌ STACK:", error?.stack);
    }
+   
    
   
   // 1️⃣ Abort transaction safely
@@ -585,6 +590,41 @@ export const completeWithdrawFund = async (req, res) => {
       throw new Error("Insufficient balance");
     }
 
+
+        const recipientCode = await createTransferRecipient({
+      name: ew.accountName,
+      accountNumber: ew.accountNumber,
+      bankCode: ew.bankCode,
+    });
+    
+    if (!recipientCode) {
+      throw new Error("Recipient creation failed");
+    }
+    
+    const paystack = await initiatePaystackTransfer({
+      amount: ew.amount,
+      recipientCode,
+      reference,
+      reason: ew.narration,
+    });
+    
+    if (isDev) {
+    console.log("🔥 PAYSTACK RAW RESPONSE:", paystack);
+    }
+    
+    if (!paystack) {
+       throw new Error("No response from Paystack");
+    }
+    
+    if (paystack.status === "failed") {
+       throw new Error("Transfer failed from Paystack");
+    }
+    
+    if (isDev) {
+    // If pending or success → continue
+    console.log("✅ Transfer accepted by Paystack:", paystack.status);
+    }
+    
     
     plan.balance -= totalDebit;
     if (isDev) {
@@ -802,81 +842,125 @@ export const failWithdrawFund = async (req, res) => {
 
 
 
-export const verifyWithdrawFundOtp = async (req, res) => {
+export const verifyEarlyWithdrawOtp = async (req, res) => {
+  if (isDev) {
+  console.log("🚀 VERIFY OTP CONTROLLER HIT");
+  }
+
   const { reference, otp } = req.body;
 
+  if (isDev) {
+  console.log("📥 REQUEST BODY:", { reference, otp });
+  }
+
   if (!reference || !otp) {
+    if (isDev) {
+    console.log("❌ Missing reference or otp");
+    }
     return res.status(400).json({
       message: "Reference and OTP are required",
     });
   }
 
   try {
+    if (isDev) {
+    console.log("🔍 Searching transaction with reference:", reference);
+    }
+
     // 1️⃣ Find transaction
     const wf = await ToBankTransaction.findOne({ reference });
 
-    if (String(wf.userId) !== String(req.user._id)) {
-  return res.status(403).json({
-    message: "Unauthorized transaction"
-  });
-}
-
-if (wf.isFinalized) {
-  return res.status(400).json({
-    message: "Transaction already completed"
-  });
-}
+    if (isDev) {
+    console.log("📦 Transaction found:", ew);
+    }
 
     if (!wf) {
+      if (isDev) {
+      console.log("❌ Transaction NOT found");
+      }
       return res.status(404).json({
         message: "Transaction not found",
       });
     }
 
-    // 2️⃣ Guard: must be waiting for OTP
+    if (isDev) {
+    console.log("📊 Transaction status:", wf.status);
+    }
+
+    // 2️⃣ Must be waiting OTP
     if (wf.status !== "OTP_REQUIRED") {
+      if (isDev) {
+      console.log("❌ Transaction not waiting for OTP");
+      }
       return res.status(400).json({
         message: "Transaction not awaiting OTP",
       });
     }
 
-    if (!wf.transferCode) {
-      return res.status(400).json({
-        message: "Missing transfer code",
-      });
+    if (isDev) {
+console.log("🔍 Searching OTP with:", { reference, otp });
     }
 
-    // 3️⃣ Call Paystack to finalize transfer
-    const response = await paystackRequest(
-      "/transfer/finalize_transfer",
-      "POST",
-      {
-        transfer_code: wf.transferCode,
-        otp,
-      }
-    );
+const otpRecord = await TransferOTP.findOne({
+  reference,
+  used: false
+});
 
-    if (!response?.data?.status) {
-      return res.status(400).json({
-        message: "OTP verification failed",
-      });
+if (isDev) {
+console.log("📄 OTP record result:", otpRecord);
+}
+
+if (!otpRecord) {
+  if (isDev) {
+  console.log("❌ OTP not found");
+  }
+  return res.status(400).json({
+    message: "Invalid or expired OTP"
+  });
+}
+
+if (String(otpRecord.otp).trim() !== String(otp).trim()) {
+  if (isDev) {
+  console.log("❌ Incorrect OTP entered");
+  }
+  return res.status(400).json({
+    message: "Incorrect OTP"
+  });
+}
+
+if (isDev) {
+console.log("✅ OTP VALID. Marking used...");
+}
+
+    // 4️⃣ Mark OTP used
+    otpRecord.used = true;
+    await otpRecord.save();
+
+    if (isDev) {
+    console.log("✅ OTP marked used");
     }
-  
-    // 4️⃣ Mark OTP verified
+
+    // 5️⃣ Mark transaction verified
     wf.status = "OTP_VERIFIED";
     wf.otpVerifiedAt = new Date();
-    wf.isFinalized = true
-    await wf.save();
+
+    await ew.save();
+
+
+    if (isDev) {
+    console.log("🎉 OTP VERIFIED SUCCESSFULLY");
+    console.log("📊 Updated transaction:", wf);
+    }
 
     return res.json({
       success: true,
-    message: "OTP verified. Processing withdrawal...",
+      message: "OTP verified. Processing withdrawal...",
       reference,
     });
 
   } catch (error) {
     if (isDev) {
-    console.error("VERIFY TO BANK OTP ERROR:", error);
+    console.error("💥 VERIFY OTP FATAL ERROR:", error);
     }
 
     return res.status(500).json({
@@ -886,7 +970,8 @@ if (wf.isFinalized) {
 };
 
 
-export const WithdrawFundStatus = async (req, res) => {
+
+export const earlyWithdrawStatus = async (req, res) => {
   try {
     const { reference } = req.query;
 
@@ -913,7 +998,7 @@ export const WithdrawFundStatus = async (req, res) => {
     });
   } catch (err) {
     if (isDev) {
-    console.error("WITHDRAW FUND STATUS ERROR:", err);
+    console.error("EARLY WITHDRAW STATUS ERROR:", err);
     }
     return res.status(500).json({
       success: false,

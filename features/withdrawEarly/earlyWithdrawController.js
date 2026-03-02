@@ -230,8 +230,9 @@ try {
 
     // 🔐 Generate OUR own OTP for user
 const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
+if (isDev) {
 console.log("✅ OTP GENERATED:", otp);
+}
 
 const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -596,7 +597,9 @@ const paystack = await initiatePaystackTransfer({
   reason: ew.narration,
 });
 
+if (isDev) {
 console.log("🔥 PAYSTACK RAW RESPONSE:", paystack);
+}
 
 if (!paystack) {
    throw new Error("No response from Paystack");
@@ -606,8 +609,10 @@ if (paystack.status === "failed") {
    throw new Error("Transfer failed from Paystack");
 }
 
+if (isDev) {
 // If pending or success → continue
 console.log("✅ Transfer accepted by Paystack:", paystack.status);
+}
 
 
     
@@ -726,9 +731,11 @@ console.log("✅ Transfer accepted by Paystack:", paystack.status);
       reference,
     });
   }catch (err) {
+    if (isDev) {
    console.log("❌ COMPLETE WITHDRAW CRASHED");
    console.log("MESSAGE:", err.message);
    console.log("STACK:", err.stack);
+    }
 
    await session.abortTransaction();
    session.endSession();
@@ -821,74 +828,102 @@ export const failEarlyWithdraw = async (req, res) => {
 
 
 export const verifyEarlyWithdrawOtp = async (req, res) => {
+  if (isDev) {
   console.log("🚀 VERIFY OTP CONTROLLER HIT");
+  }
 
   const { reference, otp } = req.body;
 
+  if (isDev) {
   console.log("📥 REQUEST BODY:", { reference, otp });
+  }
 
   if (!reference || !otp) {
+    if (isDev) {
     console.log("❌ Missing reference or otp");
+    }
     return res.status(400).json({
       message: "Reference and OTP are required",
     });
   }
 
   try {
+    if (isDev) {
     console.log("🔍 Searching transaction with reference:", reference);
+    }
 
     // 1️⃣ Find transaction
     const ew = await ToBankTransaction.findOne({ reference });
 
+    if (isDev) {
     console.log("📦 Transaction found:", ew);
+    }
 
     if (!ew) {
+      if (isDev) {
       console.log("❌ Transaction NOT found");
+      }
       return res.status(404).json({
         message: "Transaction not found",
       });
     }
 
+    if (isDev) {
     console.log("📊 Transaction status:", ew.status);
+    }
 
     // 2️⃣ Must be waiting OTP
     if (ew.status !== "OTP_REQUIRED") {
+      if (isDev) {
       console.log("❌ Transaction not waiting for OTP");
+      }
       return res.status(400).json({
         message: "Transaction not awaiting OTP",
       });
     }
 
+    if (isDev) {
 console.log("🔍 Searching OTP with:", { reference, otp });
+    }
 
 const otpRecord = await TransferOTP.findOne({
   reference,
   used: false
 });
 
+if (isDev) {
 console.log("📄 OTP record result:", otpRecord);
+}
 
 if (!otpRecord) {
+  if (isDev) {
   console.log("❌ OTP not found");
+  }
   return res.status(400).json({
     message: "Invalid or expired OTP"
   });
 }
 
 if (String(otpRecord.otp).trim() !== String(otp).trim()) {
+  if (isDev) {
   console.log("❌ Incorrect OTP entered");
+  }
   return res.status(400).json({
     message: "Incorrect OTP"
   });
 }
 
+if (isDev) {
 console.log("✅ OTP VALID. Marking used...");
+}
 
     // 4️⃣ Mark OTP used
     otpRecord.used = true;
     await otpRecord.save();
 
+    if (isDev) {
     console.log("✅ OTP marked used");
+    }
 
     // 5️⃣ Mark transaction verified
     ew.status = "OTP_VERIFIED";
@@ -896,8 +931,11 @@ console.log("✅ OTP VALID. Marking used...");
 
     await ew.save();
 
+
+    if (isDev) {
     console.log("🎉 OTP VERIFIED SUCCESSFULLY");
     console.log("📊 Updated transaction:", ew);
+    }
 
     return res.json({
       success: true,
@@ -906,7 +944,9 @@ console.log("✅ OTP VALID. Marking used...");
     });
 
   } catch (error) {
+    if (isDev) {
     console.error("💥 VERIFY OTP FATAL ERROR:", error);
+    }
 
     return res.status(500).json({
       message: error.message || "Internal server error",
