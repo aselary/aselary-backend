@@ -74,15 +74,20 @@ if (req.user && req.user.id === DEV_USER) {
  return next();
 }
 
+
+ if (isDev) {
 console.log("🛑 SECURITY BLOCK CHECK");
 console.log("riskResult:", riskResult);
 console.log("blocked:", riskResult?.blocked);
 console.log("score:", riskResult?.score);
 console.log("reference:", req.body.reference);
 console.log("user:", req.user?.id);
+ }
 
 if (riskResult.blocked && !req.body.reference) {
+   if (isDev) {
   console.log("🚨🚨🚨 403 TRIGGERED HERE 🚨🚨🚨");
+   }
   return res.status(403).json({
     success:false,
     message: riskResult.reason || "High risk action blocked"

@@ -255,7 +255,7 @@ const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 );
 
 
- await TransferOTP.create({
+ const savedOtp = await TransferOTP.create({
   userId,
   reference,
   otp: String(otp).trim(),
@@ -263,7 +263,7 @@ const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
   used: false
 });
 
-const savedOtp = savedOtpArr[0]; // get real object
+
 
 if (isDev) {
 console.log("🔥 OTP SAVED:", savedOtp);
@@ -852,7 +852,7 @@ export const verifyEarlyWithdrawOtp = async (req, res) => {
 console.log("🔍 Searching OTP with:", { reference, otp });
 
 const otpRecord = await TransferOTP.findOne({
-  reference: reference.trim(),
+  reference,
   used: false
 });
 
