@@ -598,9 +598,16 @@ const paystack = await initiatePaystackTransfer({
 
 console.log("🔥 PAYSTACK RAW RESPONSE:", paystack);
 
-if (!paystack || paystack.status !== "success") {
-  throw new Error("Transfer failed from Paystack");
+if (!paystack) {
+   throw new Error("No response from Paystack");
 }
+
+if (paystack.status === "failed") {
+   throw new Error("Transfer failed from Paystack");
+}
+
+// If pending or success → continue
+console.log("✅ Transfer accepted by Paystack:", paystack.status);
 
 
     
