@@ -971,7 +971,7 @@ console.log("✅ OTP VALID. Marking used...");
 
 
 
-export const earlyWithdrawStatus = async (req, res) => {
+export const WithdrawFundStatus = async (req, res) => {
   try {
     const { reference } = req.query;
 
