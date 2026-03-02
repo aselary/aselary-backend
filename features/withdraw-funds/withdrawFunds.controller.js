@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Wallet from "../models/Wallet.js";
 import Ledger from "../models/Ledger.js";
+import User from "../models/User.js";
 import ToBankTransaction from "../models/ToBankTransaction.js";
 import ActivityLog from "../models/ActivityLog.js";
 import Transaction from "../models/Transaction.js";
