@@ -267,7 +267,7 @@ const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
 
 if (isDev) {
-console.log("🔥 OTP SAVED IN:", savedOtp);
+console.log("🔥 OTP SAVED:", savedOtp);
 }
   
     if (isDev) {
