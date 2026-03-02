@@ -945,7 +945,7 @@ console.log("✅ OTP VALID. Marking used...");
     wf.status = "OTP_VERIFIED";
     wf.otpVerifiedAt = new Date();
 
-    await ew.save();
+    await wf.save();
 
 
     if (isDev) {
@@ -963,10 +963,6 @@ console.log("✅ OTP VALID. Marking used...");
     if (isDev) {
     console.error("💥 VERIFY OTP FATAL ERROR:", error);
     }
-    console.log("❌ COMPLETE WITHDRAW CRASHED");
-   console.log("MESSAGE:", err.message);
-   console.log("STACK:", err.stack);
-
     return res.status(500).json({
       message: error.message || "Internal server error",
     });
