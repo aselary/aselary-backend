@@ -95,7 +95,7 @@ if (riskResult.blocked && !req.body.reference) {
 }
 
 // ⚠️ THROTTLE medium risk
-if (riskResult.score >= 75) {
+if (riskResult.score >= 150) {
  return res.status(429).json({
   success:false,
   message:"Too many rapid transfer to this recipient."
