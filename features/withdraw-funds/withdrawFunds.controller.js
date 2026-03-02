@@ -243,7 +243,7 @@ try {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
 
-    const withdrawFundTxn = await ToBankTransaction.create(
+  await ToBankTransaction.create(
   [{
     userId,
     walletId: wallet._id,    
@@ -256,7 +256,7 @@ try {
     accountNumber,
     accountName,
     reference,
-    status: "PENDING",
+    status: "OTP_REQUIRED",
   }],
   { session }
 );
