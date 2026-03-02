@@ -842,7 +842,7 @@ export const failWithdrawFund = async (req, res) => {
 
 
 
-export const verifyEarlyWithdrawOtp = async (req, res) => {
+export const verifyWithdrawFundOtp = async (req, res) => {
   if (isDev) {
   console.log("🚀 VERIFY OTP CONTROLLER HIT");
   }
