@@ -579,16 +579,15 @@ export const completeEarlyWithdraw = async (req, res) => {
       throw new Error("Insufficient balance");
     }
 
- const recipientCode = await createTransferRecipient({
-  name: accountName,
-  accountNumber,
-  bankCode,
+    const recipientCode = await createTransferRecipient({
+  name: ew.accountName,
+  accountNumber: ew.accountNumber,
+  bankCode: ew.bankCode,
 });
 
 if (!recipientCode) {
-  throw new Error("Failed to create Paystack recipient");
+  throw new Error("Recipient creation failed");
 }
-
 
 const paystack = await initiatePaystackTransfer({
   amount: ew.amount,
