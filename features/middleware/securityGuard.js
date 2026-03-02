@@ -7,8 +7,10 @@ export async function securityGuard(req, res, next) {
 
     // ✅ BYPASS security checks for resolve endpoints
     if (
-      req.path.includes("/to-bank/complete") ||
-      req.path.includes("/to-bank/fail")
+      req.path.includes("/early-withdraw/complete") ||
+      req.path.includes("/early-withdraw/fail") ||
+      req.path.includes("/fund-bank/complete") ||
+      req.path.includes("/fund-bank/fail")
     ) {
       return next();
     }
