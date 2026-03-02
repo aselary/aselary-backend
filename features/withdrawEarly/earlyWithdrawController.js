@@ -716,18 +716,19 @@ if (!paystack || paystack.status !== "success") {
       message: "Transfer settled successfully",
       reference,
     });
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-     if (isDev) {
-    console.error("COMPLETE EARLY_WITHDRAW ERROR:", error);
-     }
-     
+  }catch (err) {
+   console.log("❌ COMPLETE WITHDRAW CRASHED");
+   console.log("MESSAGE:", err.message);
+   console.log("STACK:", err.stack);
 
-    return res.status(500).json({
-      message: error.message || "Internal server error",
-    });
-  }
+   await session.abortTransaction();
+   session.endSession();
+
+   return res.status(500).json({
+      success:false,
+      message: err.message
+   });
+}
 };
 
 
