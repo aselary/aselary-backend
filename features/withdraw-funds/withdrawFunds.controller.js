@@ -593,9 +593,9 @@ export const completeWithdrawFund = async (req, res) => {
 
 
         const recipientCode = await createTransferRecipient({
-      name: ew.accountName,
-      accountNumber: ew.accountNumber,
-      bankCode: ew.bankCode,
+      name: wf.accountName,
+      accountNumber: wf.accountNumber,
+      bankCode: wf.bankCode,
     });
     
     if (!recipientCode) {
@@ -603,10 +603,10 @@ export const completeWithdrawFund = async (req, res) => {
     }
     
     const paystack = await initiatePaystackTransfer({
-      amount: ew.amount,
+      amount: wf.amount,
       recipientCode,
       reference,
-      reason: ew.narration,
+      reason: wf.narration,
     });
     
     if (isDev) {
