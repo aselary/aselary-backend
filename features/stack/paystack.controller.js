@@ -1,3 +1,4 @@
+import fetch from "node-fetch"
 import isDev from "../utils/isDev.js";
 
 export const createPaystackCustomer = async (user) => {
@@ -49,6 +50,9 @@ const body = {
 };
 
 
+
+console.log("Creating Paystack Dedicated Account...");
+console.log("Request body:", body);
 
   const response = await fetch(
     "https://api.paystack.co/dedicated_account",
