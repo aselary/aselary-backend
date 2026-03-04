@@ -294,6 +294,9 @@ console.log("📩 ABOUT TO SEND EMAIL TO:", email);
 
 // Send OTP to user email
 try {
+  
+  console.log("MAIL_FROM ENV:", process.env.MAIL_FROM);
+
   const info = await sendEmail({
   to: email,
   subject: "Confirm your withdrawal",
