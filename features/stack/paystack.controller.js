@@ -38,9 +38,6 @@ export const createPaystackCustomer = async (user) => {
    CREATE PAYSTACK DEDICATED ACCOUNT
 ===================================================== */
 export const createDedicatedAccount = async (customerCode) => {
-  const isPaystackLive =
-  process.env.PAYSTACK_SECRET_KEY?.startsWith("sk_live");
-
   
   if (!customerCode) {
     throw new Error("Paystack customer code is required");
@@ -48,12 +45,9 @@ export const createDedicatedAccount = async (customerCode) => {
 
 const body = {
   customer: customerCode,
+   preferred_bank : "wema-bank",
 };
 
-// ✅ ONLY IN PRODUCTION
-if (isPaystackLive) {
-  body.preferred_bank = "wema-bank";
-}
 
 
   const response = await fetch(
@@ -69,6 +63,8 @@ if (isPaystackLive) {
   );
 
   const json = await response.json();
+
+  console.log("PAYSTACK DVA RESPONSE:", json);
 
   if (!response.ok) {
     if (isDev) {
