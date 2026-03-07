@@ -50,9 +50,10 @@ const body = {
 };
 
 
-
+if (isDev) {
 console.log("Creating Paystack Dedicated Account...");
 console.log("Request body:", body);
+}
 
   const response = await fetch(
     "https://api.paystack.co/dedicated_account",
@@ -68,7 +69,9 @@ console.log("Request body:", body);
 
   const json = await response.json();
 
+  if (isDev) {
   console.log("PAYSTACK DVA RESPONSE:", json);
+  }
 
   if (!response.ok) {
     if (isDev) {
