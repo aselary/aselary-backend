@@ -44,12 +44,16 @@ export const createDedicatedAccount = async (customerCode) => {
     throw new Error("Paystack customer code is required");
   }
 
-const isPaystackLive = process.env.PAYSTACK_SECRET_KEY?.startsWith("sk_live");
+const isPaystackLive =
+  process.env.PAYSTACK_SECRET_KEY?.startsWith("sk_live");
 
 const body = {
   customer: customerCode,
-  preferred_bank: isPaystackLive ? "paystack-titan" : "wema-bank",
 };
+
+if (isPaystackLive) {
+  body.preferred_bank = "paystack-titan";
+}
 
 
 if (isDev) {

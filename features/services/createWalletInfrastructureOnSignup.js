@@ -73,7 +73,9 @@ console.log("Existing customer code:", user.paystackCustomerCode);
 
   if (!customerCode) {
     customerCode = await createPaystackCustomer(user);
+    if (isDev) {
     console.log("Paystack customer created:", customerCode);
+    }
     user.paystackCustomerCode = customerCode;
      await user.save();
   }
