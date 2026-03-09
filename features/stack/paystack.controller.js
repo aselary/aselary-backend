@@ -45,7 +45,7 @@ export const createDedicatedAccount = async (customerCode) => {
   }
 
 const isPaystackLive =
-  process.env.PAYSTACK_SECRET_KEY?.startsWith("sk_live");
+  process.env.PAYSTACK_SECRET_KEY?.startsWith("sk_live_");
 
 const body = {
   customer: customerCode,
@@ -75,14 +75,14 @@ console.log("Request body:", body);
 
   const json = await response.json();
 
-  if (isDev) {
+
   console.log("PAYSTACK DVA RESPONSE:", json);
-  }
+  
 
   if (!response.ok) {
-    if (isDev) {
+   
     console.error("PAYSTACK DEDICATED ERROR:", json);
-    }
+    
     throw new Error(json.message || "Paystack dedicated account failed");
   }
 
